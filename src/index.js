@@ -7,7 +7,12 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import { loadConfig } from './utils/config.js';
 import { logger } from './utils/logger.js';
 import { pluginManager } from './plugins/index.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import chalk from 'chalk';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const config = loadConfig();
@@ -17,7 +22,6 @@ async function initPlugins() {
   await pluginManager.loadBuiltInPlugins();
   await pluginManager.loadCustomPlugins('./plugins');
   
-  // Load plugin configuration from config
   const pluginConfig = config.plugins || {};
   
   for (const [pluginName, options] of Object.entries(pluginConfig)) {
@@ -37,6 +41,9 @@ async function initPlugins() {
 // Middleware
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json());
+
+// Serve static UI files
+app.use(express.static(path.join(__dirname, '../ui')));
 
 // Request logging
 app.use((req, res, next) => {
@@ -65,6 +72,13 @@ app.use(pluginManager.createMiddleware());
 // API Routes
 app.use('/api', require('./routes/proxy.js'));
 
+// SPA fallback - serve index.html for non-API routes
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api') && !req.path.startsWith('/admin') && !req.path.startsWith('/health')) {
+    res.sendFile(path.join(__dirname, '../ui/index.html'));
+  }
+});
+
 // Error handler
 app.use((err, req, res, next) => {
   logger.error(err.message, { stack: err.stack });
@@ -82,16 +96,17 @@ async function start() {
   
   app.listen(PORT, () => {
     console.log(chalk.cyan(`
-╔═══════════════════════════════════════════╗
-║                                           ║
-║   🅰️ PIX Gateway  v1.0.0                   ║
-║                                           ║
-║   🚀 Server running on port ${PORT}            ║
-║   📊 Admin API: http://localhost:${PORT}/admin  ║
-║   ❤️  Health:   http://localhost:${PORT}/health  ║
-║   🔌 Plugins:  ${pluginManager.enabledPlugins.size} enabled                   ║
-║                                           ║
-╚═══════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║   🚀 APIX Gateway  v1.0.0                                     ║
+║                                                               ║
+║   🌐 Server:      http://localhost:${PORT}                        ║
+║   📊 Dashboard:   http://localhost:${PORT}/                        ║
+║   ❤️  Health:     http://localhost:${PORT}/health                    ║
+║   ⚙️  Admin API:  http://localhost:${PORT}/admin                     ║
+║   🔌 Plugins:    ${pluginManager.enabledPlugins.size} enabled                              ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
     `));
   });
 }

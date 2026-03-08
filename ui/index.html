@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>APIX Gateway - Admin Dashboard</title>
+  <link rel="stylesheet" href="/ui/css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+</head>
+<body>
+  <!-- Login Screen -->
+  <div class="login-container">
+    <div class="login-box">
+      <div class="login-logo">
+        <h1>🚀 APIX</h1>
+        <p>API Gateway Dashboard</p>
+      </div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="username" placeholder="admin" required>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="password" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Sign In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <h2>🚀 APIX</h2>
+      </div>
+      <ul class="nav-menu">
+        <li class="nav-item">
+          <a href="#" class="nav-link active" data-page="dashboard">
+            <span class="nav-icon">📊</span>
+            Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link" data-page="plugins">
+            <span class="nav-icon">🔌</span>
+            Plugins
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link" data-page="keys">
+            <span class="nav-icon">🔑</span>
+            API Keys
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link" data-page="circuits">
+            <span class="nav-icon">⚡</span>
+            Circuits
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link" data-page="routes">
+            <span class="nav-icon">🛤️</span>
+            Routes
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link" data-page="logs">
+            <span class="nav-icon">📝</span>
+            Logs
+          </a>
+        </li>
+        <li class="nav-item" style="margin-top: auto;">
+          <a href="#" class="nav-link" onclick="logout();return false;">
+            <span class="nav-icon">🚪</span>
+            Logout
+          </a>
+        </li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Dashboard Page -->
+      <div id="dashboard" class="page">
+        <div class="page-header">
+          <h1 class="page-title">Dashboard</h1>
+          <span style="color: var(--text-muted)">Real-time statistics</span>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card fade-in">
+            <div class="stat-card-header">
+              <span class="stat-card-title">Uptime</span>
+              <div class="stat-card-icon uptime">⏱️</div>
+            </div>
+            <div class="stat-value" id="statUptime">-</div>
+            <div class="stat-label">Server running time</div>
+          </div>
+
+          <div class="stat-card fade-in">
+            <div class="stat-card-header">
+              <span class="stat-card-title">Memory</span>
+              <div class="stat-card-icon requests">💾</div>
+            </div>
+            <div class="stat-value" id="statMemory">-</div>
+            <div class="stat-label">Heap used</div>
+          </div>
+
+          <div class="stat-card fade-in">
+            <div class="stat-card-header">
+              <span class="stat-card-title">Requests</span>
+              <div class="stat-card-icon requests">📈</div>
+            </div>
+            <div class="stat-value" id="statRequests">-</div>
+            <div class="stat-label">Total requests</div>
+          </div>
+
+          <div class="stat-card fade-in">
+            <div class="stat-card-header">
+              <span class="stat-card-title">Errors</span>
+              <div class="stat-card-icon errors">❌</div>
+            </div>
+            <div class="stat-value" id="statErrors">-</div>
+            <div class="stat-label">Failed requests</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Request Overview</h3>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              📊 Request chart visualization (connect to metrics plugin)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Plugins Page -->
+      <div id="plugins" class="page" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">Plugins</h1>
+        </div>
+        <div class="plugins-grid" id="pluginsGrid">
+          <!-- Plugins loaded via JS -->
+        </div>
+      </div>
+
+      <!-- API Keys Page -->
+      <div id="keys" class="page" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">API Keys</h1>
+          <button class="btn btn-primary" onclick="showCreateKeyModal()">+ New Key</button>
+        </div>
+        <div class="card">
+          <div class="card-body" style="padding: 0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Key</th>
+                  <th>Rate Limit</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="apiKeysTable">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Circuits Page -->
+      <div id="circuits" class="page" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">Circuit Breakers</h1>
+        </div>
+        <div class="card">
+          <div class="card-body" style="padding: 0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Service</th>
+                  <th>State</th>
+                  <th>Failures</th>
+                  <th>Successes</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="circuitsTable">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Routes Page -->
+      <div id="routes" class="page" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">Routes</h1>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Path</th>
+                  <th>Target</th>
+                  <th>Methods</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>/api/users</td>
+                  <td>http://localhost:3001</td>
+                  <td>GET, POST, PUT, DELETE</td>
+                  <td><span class="status-badge active">● Active</span></td>
+                </tr>
+                <tr>
+                  <td>/api/orders</td>
+                  <td>http://localhost:3002</td>
+                  <td>GET, POST</td>
+                  <td><span class="status-badge active">● Active</span></td>
+                </tr>
+                <tr>
+                  <td>/api/products</td>
+                  <td>http://localhost:3003</td>
+                  <td>GET</td>
+                  <td><span class="status-badge active">● Active</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs Page -->
+      <div id="logs" class="page" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">Logs</h1>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <div style="font-family: monospace; font-size: 0.875rem; color: var(--text-muted);">
+              <p>[2024-01-15T10:30:00Z] INFO Gateway started on port 3000</p>
+              <p>[2024-01-15T10:30:01Z] INFO Loaded 20 plugins</p>
+              <p>[2024-01-15T10:30:05Z] INFO Request: GET /health - 200</p>
+              <p>[2024-01-15T10:31:00Z] WARN Rate limit exceeded for 192.168.1.1</p>
+              <p>[2024-01-15T10:32:00Z] ERROR Upstream timeout /api/users</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/ui/js/app.js"></script>
+</body>
+</html>
