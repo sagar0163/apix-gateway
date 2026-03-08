@@ -1,0 +1,56 @@
+{
+  "rate-limiter": {
+    "enabled": true,
+    "windowMs": 60000,
+    "maxRequests": 100,
+    "message": "Too Many Requests"
+  },
+  "jwt-auth": {
+    "enabled": false,
+    "secret": "change-this-secret",
+    "expiresIn": "24h",
+    "publicPaths": ["/health", "/admin/login", "/api/public"]
+  },
+  "api-key": {
+    "enabled": false,
+    "headerName": "x-api-key"
+  },
+  "cors": {
+    "enabled": true,
+    "origin": "*",
+    "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    "credentials": true
+  },
+  "request-transformer": {
+    "enabled": false,
+    "addHeaders": {
+      "X-Custom-Header": "value"
+    },
+    "removeHeaders": ["x-internal"]
+  },
+  "response-transformer": {
+    "enabled": false,
+    "wrapResponse": true,
+    "wrapperKey": "data"
+  },
+  "ip-whitelist": {
+    "enabled": false,
+    "ips": ["127.0.0.1", "192.168.1.0/24"],
+    "mode": "allow"
+  },
+  "metrics": {
+    "enabled": true
+  },
+  "circuit-breaker": {
+    "enabled": false,
+    "failureThreshold": 5,
+    "successThreshold": 2,
+    "timeout": 30000,
+    "windowMs": 60000
+  },
+  "compression": {
+    "enabled": false,
+    "threshold": 1024,
+    "level": 6
+  }
+}
