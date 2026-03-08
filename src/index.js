@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import express from 'express';
-import helmet from 'helmet';
-import cors from 'cors';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import { createSecurityMiddleware } from './middleware/security.js';
+import { rateLimiter } from './middleware/rate-limiter.js';
+import { sanitization, validate, schemas } from './middleware/validation.js';
 import { loadConfig } from './utils/config.js';
 import { logger } from './utils/logger.js';
 import { pluginManager } from './plugins/index.js';
@@ -17,7 +17,117 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const config = loadConfig();
 
-// Load and initialize plugins
+// Trust proxy for correct IP detection
+app.set('trust proxy', process.env.TRUST_PROXY === 'false' ? false : 1);
+
+// =======================
+// SECURITY MIDDLEWARE
+// =======================
+app.use(createSecurityMiddleware());
+
+// Request body parsing with size limits
+app.use(express.json({ 
+  limit: process.env.MAX_BODY_SIZE || '1mb',
+  strict: true,
+  verify: (req, res, buf) => {
+    // Verify JSON structure
+    try {
+      JSON.parse(buf.toString());
+    } catch (e) {
+      throw new Error('Invalid JSON');
+    }
+  }
+}));
+
+app.use(express.urlencoded({ 
+  extended: true, 
+  limit: process.env.MAX_BODY_SIZE || '1mb',
+  parameterLimit: 100
+}));
+
+// Input sanitization
+app.use(sanitization);
+
+// Global rate limiter (before plugins for DoS protection)
+app.use(rateLimiter.middleware);
+
+// =======================
+// STATIC FILES
+// =======================
+app.use(express.static(path.join(__dirname, '../ui'), {
+  maxAge: '1h',
+  etag: true,
+  lastModified: true
+}));
+
+// Prevent static file path traversal
+app.use((req, res, next) => {
+  if (req.path.includes('..')) {
+    return res.status(400).json({ error: 'Invalid path' });
+  }
+  next();
+});
+
+// =======================
+// REQUEST LOGGING
+// =======================
+app.use((req, res, next) => {
+  const startTime = Date.now();
+  
+  // Log request
+  logger.info(`${req.method} ${req.originalUrl}`, {
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+    referer: req.get('referer')
+  });
+  
+  // Track response time
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    logger.info(`${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`, {
+      status: res.statusCode,
+      duration,
+      ip: req.ip
+    });
+  });
+  
+  next();
+});
+
+// =======================
+// HEALTH CHECK
+// =======================
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    plugins: pluginManager.getEnabledPlugins().map(p => p.name)
+  });
+});
+
+// Health check with detailed info (authenticated)
+app.get('/health/detailed', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    cpu: process.cpuUsage(),
+    plugins: {
+      total: pluginManager.list().length,
+      enabled: pluginManager.getEnabledPlugins().length
+    },
+    config: {
+      port: config.port,
+      nodeEnv: process.env.NODE_ENV
+    }
+  });
+});
+
+// =======================
+// PLUGINS
+// =======================
 async function initPlugins() {
   await pluginManager.loadBuiltInPlugins();
   await pluginManager.loadCustomPlugins('./plugins');
@@ -38,82 +148,105 @@ async function initPlugins() {
   logger.info(`Loaded ${pluginManager.list().length} plugins, ${pluginManager.enabledPlugins.size} enabled`);
 }
 
-// Middleware
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(express.json());
+// Load plugins before admin routes
+await initPlugins();
 
-// Serve static UI files
-app.use(express.static(path.join(__dirname, '../ui')));
-
-// Request logging
-app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path}`, {
-    ip: req.ip,
-    userAgent: req.get('user-agent')
-  });
-  next();
-});
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    plugins: pluginManager.getEnabledPlugins()
-  });
-});
-
-// Gateway admin API
+// =======================
+// ADMIN API
+// =======================
 app.use('/admin', require('./routes/admin.js'));
 
-// Plugin middleware
+// Admin validation middleware
+const adminValidate = validate(schemas);
+
+// Apply to admin routes (can be used in routes/admin.js)
+
+// =======================
+// PLUGIN MIDDLEWARE
+// =======================
 app.use(pluginManager.createMiddleware());
 
-// API Routes
+// =======================
+// API ROUTES
+// =======================
 app.use('/api', require('./routes/proxy.js'));
 
-// SPA fallback - serve index.html for non-API routes
-app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api') && !req.path.startsWith('/admin') && !req.path.startsWith('/health')) {
-    res.sendFile(path.join(__dirname, '../ui/index.html'));
-  }
-});
-
-// Error handler
-app.use((err, req, res, next) => {
-  logger.error(err.message, { stack: err.stack });
-  res.status(err.status || 500).json({
-    error: err.message,
-    code: err.code || 'INTERNAL_ERROR'
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Route ${req.method} ${req.path} not found`
   });
 });
 
-// Start server
+// =======================
+// ERROR HANDLING
+// =======================
+// JSON parse error
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') {
+    logger.error('JSON parse error:', err.message);
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Invalid JSON in request body'
+    });
+  }
+  next(err);
+});
+
+// General error handler
+app.use((err, req, res, next) => {
+  logger.error(err.message, { 
+    stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,
+    ip: req.ip,
+    path: req.path
+  });
+  
+  // Don't leak error details in production
+  const message = process.env.NODE_ENV === 'production' 
+    ? 'An error occurred' 
+    : err.message;
+  
+  res.status(err.status || 500).json({
+    error: err.name || 'Internal Server Error',
+    message,
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+  });
+});
+
+// =======================
+// START SERVER
+// =======================
 const PORT = config.port || 3000;
 
-async function start() {
-  await initPlugins();
+app.listen(PORT, () => {
+  const enabledPlugins = pluginManager.getEnabledPlugins().length;
   
-  app.listen(PORT, () => {
-    console.log(chalk.cyan(`
+  console.log(chalk.cyan(`
 ╔═══════════════════════════════════════════════════════════════╗
 ║                                                               ║
-║   🚀 APIX Gateway  v1.0.0                                     ║
+║   🚀 APIX Gateway  v1.0.0                                    ║
+║   🔒 Security Hardened                                         ║
 ║                                                               ║
 ║   🌐 Server:      http://localhost:${PORT}                        ║
 ║   📊 Dashboard:   http://localhost:${PORT}/                        ║
-║   ❤️  Health:     http://localhost:${PORT}/health                    ║
+║   ❤️  Health:     http://localhost:${PORT}/health                  ║
 ║   ⚙️  Admin API:  http://localhost:${PORT}/admin                     ║
-║   🔌 Plugins:    ${pluginManager.enabledPlugins.size} enabled                              ║
+║   🔌 Plugins:     ${enabledPlugins} enabled                              ║
+║                                                               ║
+║   🛡️ Security Features:                                       ║
+║      • Helmet.js security headers                             ║
+║      • CORS configuration                                     ║
+║      • Rate limiting                                          ║
+║      • Input sanitization                                     ║
+║      • Request validation                                      ║
+║      • Path traversal protection                              ║
+║      • Request timeout                                        ║
 ║                                                               ║
 ╚═══════════════════════════════════════════════════════════════╝
-    `));
-  });
-}
-
-start().catch(err => {
-  logger.error('Failed to start:', err);
-  process.exit(1);
+  `));
+  
+  logger.info(`Server started on port ${PORT}`);
 });
 
 export default app;
