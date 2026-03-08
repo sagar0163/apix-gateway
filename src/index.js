@@ -3,6 +3,7 @@
 import express from 'express';
 import { createSecurityMiddleware } from './middleware/security.js';
 import { rateLimiter } from './middleware/rate-limiter.js';
+import { prometheusMetrics } from './middleware/prometheus.js';
 import { sanitization, validate, schemas } from './middleware/validation.js';
 import { loadConfig } from './utils/config.js';
 import { logger } from './utils/logger.js';
@@ -50,6 +51,9 @@ app.use(sanitization);
 
 // Global rate limiter (before plugins for DoS protection)
 app.use(rateLimiter.middleware);
+
+// Prometheus metrics
+app.use(prometheusMetrics({ prefix: 'apix' }));
 
 // =======================
 // STATIC FILES

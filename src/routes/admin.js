@@ -5,6 +5,8 @@ import { pluginManager } from '../plugins/index.js';
 import { rateLimiter } from '../middleware/rate-limiter.js';
 import { ddosProtection, ddosStats, getBlockedIPs, unblockIP } from '../middleware/ddos-protection.js';
 import { connectionPoolStats, clearCache } from '../middleware/performance.js';
+import { prometheusMetrics, getPrometheusMetrics, getMetricsJSON, resetMetrics } from '../middleware/prometheus.js';
+import { getConnectionStats } from '../middleware/websocket.js';
 import { validate, schemas } from '../middleware/validation.js';
 import { logger } from '../utils/logger.js';
 
@@ -129,13 +131,35 @@ router.get('/health', authenticate, (req, res) => {
 // Metrics
 // =======================
 
+// Prometheus metrics endpoint (no auth for scraping)
+router.get('/metrics/prometheus', (req, res) => {
+  res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  res.send(getPrometheusMetrics());
+});
+
+// JSON metrics
+router.get('/metrics/json', authenticate, (req, res) => {
+  res.json(getMetricsJSON());
+});
+
+// Reset metrics
+router.post('/metrics/reset', authenticate, requireAdmin, (req, res) => {
+  resetMetrics();
+  res.json({ success: true, message: 'Metrics reset' });
+});
+
 router.get('/metrics', authenticate, (req, res) => {
   const m = pluginManager.getPlugin('metrics');
   if (m && m.getMetrics) {
     res.json(m.getMetrics());
   } else {
-    res.json({ error: 'Metrics plugin not enabled' });
+    res.json(getMetricsJSON());
   }
+});
+
+// WebSocket stats
+router.get('/websocket', authenticate, (req, res) => {
+  res.json(getConnectionStats());
 });
 
 // Traffic stats
