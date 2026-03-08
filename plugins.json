@@ -15,6 +15,30 @@
     "enabled": false,
     "headerName": "x-api-key"
   },
+  "basic-auth": {
+    "enabled": false,
+    "users": {}
+  },
+  "hmac-auth": {
+    "enabled": false,
+    "secret": "",
+    "algorithm": "sha256"
+  },
+  "oauth2": {
+    "enabled": false,
+    "clientId": "",
+    "clientSecret": "",
+    "tokenEndpoint": "",
+    "introspectionEndpoint": "",
+    "publicPaths": ["/health"]
+  },
+  "keycloak": {
+    "enabled": false,
+    "realm": "",
+    "authServerUrl": "",
+    "clientId": "",
+    "public": false
+  },
   "cors": {
     "enabled": true,
     "origin": "*",
@@ -33,13 +57,36 @@
     "wrapResponse": true,
     "wrapperKey": "data"
   },
+  "header-enrichment": {
+    "enabled": false,
+    "addRequestHeaders": {},
+    "removeRequestHeaders": [],
+    "addResponseHeaders": {},
+    "removeResponseHeaders": []
+  },
+  "url-rewrite": {
+    "enabled": false,
+    "rules": []
+  },
   "ip-whitelist": {
     "enabled": false,
     "ips": ["127.0.0.1", "192.168.1.0/24"],
     "mode": "allow"
   },
+  "bot-detection": {
+    "enabled": false,
+    "blockBots": true,
+    "allowVerified": true
+  },
   "metrics": {
     "enabled": true
+  },
+  "request-log": {
+    "enabled": false,
+    "logLevel": "info",
+    "logHeaders": false,
+    "logBody": false,
+    "json": true
   },
   "circuit-breaker": {
     "enabled": false,
@@ -52,5 +99,47 @@
     "enabled": false,
     "threshold": 1024,
     "level": 6
+  },
+  "cache": {
+    "enabled": false,
+    "ttl": 60,
+    "cacheBy": "url"
+  },
+  "quota": {
+    "enabled": false,
+    "quota": 1000,
+    "window": "day",
+    "keyBy": "user"
+  },
+  "request-size": {
+    "enabled": false,
+    "maxBodySize": 1048576,
+    "maxHeaderSize": 8192
+  },
+  "timeout": {
+    "enabled": false,
+    "upstreamTimeout": 30000,
+    "idleTimeout": 60000
+  },
+  "retry": {
+    "enabled": false,
+    "retries": 3,
+    "retryDelay": 100,
+    "retryOn": [502, 503, 504]
+  },
+  "load-balancer": {
+    "enabled": false,
+    "targets": [],
+    "strategy": "round-robin"
+  },
+  "websocket": {
+    "enabled": false,
+    "path": "/ws",
+    "target": "",
+    "heartbeat": 30000
+  },
+  "request-validator": {
+    "enabled": false,
+    "schemas": {}
   }
 }
