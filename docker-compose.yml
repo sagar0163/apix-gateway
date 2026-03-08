@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  apix-gateway:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret}
+      - REDIS_URL=redis://redis:6379
+      - ALLOWED_ORIGINS=*
+      - LOG_LEVEL=info
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - apix-network
+    volumes:
+      - ./plugins.json:/app/plugins.json:ro
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - apix-network
+    command: redis-server --appendonly yes
+
+  # Optional: Admin dashboard (static)
+  # Uncomment to serve UI separately
+  # admin:
+  #   image: nginx:alpine
+  #   ports:
+  #     - "3001:80"
+  #   volumes:
+  #     - ./ui:/usr/share/nginx/html:ro
+  #   depends_on:
+  #     - apix-gateway
+  #   networks:
+  #     - apix-network
+
+networks:
+  apix-network:
+    driver: bridge
+
+volumes:
+  redis-data:
