@@ -1,145 +1,40 @@
 {
-  "rate-limiter": {
-    "enabled": true,
-    "windowMs": 60000,
-    "maxRequests": 100,
-    "message": "Too Many Requests"
-  },
-  "jwt-auth": {
-    "enabled": false,
-    "secret": "change-this-secret",
-    "expiresIn": "24h",
-    "publicPaths": ["/health", "/admin/login", "/api/public"]
-  },
-  "api-key": {
-    "enabled": false,
-    "headerName": "x-api-key"
-  },
-  "basic-auth": {
-    "enabled": false,
-    "users": {}
-  },
-  "hmac-auth": {
-    "enabled": false,
-    "secret": "",
-    "algorithm": "sha256"
-  },
-  "oauth2": {
-    "enabled": false,
-    "clientId": "",
-    "clientSecret": "",
-    "tokenEndpoint": "",
-    "introspectionEndpoint": "",
-    "publicPaths": ["/health"]
-  },
-  "keycloak": {
-    "enabled": false,
-    "realm": "",
-    "authServerUrl": "",
-    "clientId": "",
-    "public": false
-  },
-  "cors": {
-    "enabled": true,
-    "origin": "*",
-    "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    "credentials": true
-  },
-  "request-transformer": {
-    "enabled": false,
-    "addHeaders": {
-      "X-Custom-Header": "value"
-    },
-    "removeHeaders": ["x-internal"]
-  },
-  "response-transformer": {
-    "enabled": false,
-    "wrapResponse": true,
-    "wrapperKey": "data"
-  },
-  "header-enrichment": {
-    "enabled": false,
-    "addRequestHeaders": {},
-    "removeRequestHeaders": [],
-    "addResponseHeaders": {},
-    "removeResponseHeaders": []
-  },
-  "url-rewrite": {
-    "enabled": false,
-    "rules": []
-  },
-  "ip-whitelist": {
-    "enabled": false,
-    "ips": ["127.0.0.1", "192.168.1.0/24"],
-    "mode": "allow"
-  },
-  "bot-detection": {
-    "enabled": false,
-    "blockBots": true,
-    "allowVerified": true
-  },
-  "metrics": {
-    "enabled": true
-  },
-  "request-log": {
-    "enabled": false,
-    "logLevel": "info",
-    "logHeaders": false,
-    "logBody": false,
-    "json": true
-  },
-  "circuit-breaker": {
-    "enabled": false,
-    "failureThreshold": 5,
-    "successThreshold": 2,
-    "timeout": 30000,
-    "windowMs": 60000
-  },
-  "compression": {
-    "enabled": false,
-    "threshold": 1024,
-    "level": 6
-  },
-  "cache": {
-    "enabled": false,
-    "ttl": 60,
-    "cacheBy": "url"
-  },
-  "quota": {
-    "enabled": false,
-    "quota": 1000,
-    "window": "day",
-    "keyBy": "user"
-  },
-  "request-size": {
-    "enabled": false,
-    "maxBodySize": 1048576,
-    "maxHeaderSize": 8192
-  },
-  "timeout": {
-    "enabled": false,
-    "upstreamTimeout": 30000,
-    "idleTimeout": 60000
-  },
-  "retry": {
-    "enabled": false,
-    "retries": 3,
-    "retryDelay": 100,
-    "retryOn": [502, 503, 504]
-  },
-  "load-balancer": {
-    "enabled": false,
-    "targets": [],
-    "strategy": "round-robin"
-  },
-  "websocket": {
-    "enabled": false,
-    "path": "/ws",
-    "target": "",
-    "heartbeat": 30000
-  },
-  "request-validator": {
-    "enabled": false,
-    "schemas": {}
-  }
+  "rate-limiter": { "enabled": true, "windowMs": 60000, "maxRequests": 100 },
+  "jwt-auth": { "enabled": false, "secret": "change-this" },
+  "api-key": { "enabled": false },
+  "basic-auth": { "enabled": false, "users": {} },
+  "hmac-auth": { "enabled": false, "secret": "" },
+  "oauth2": { "enabled": false, "clientId": "", "tokenEndpoint": "" },
+  "keycloak": { "enabled": false, "realm": "", "authServerUrl": "" },
+  "cors": { "enabled": true, "origin": "*" },
+  "request-transformer": { "enabled": false },
+  "response-transformer": { "enabled": false },
+  "header-enrichment": { "enabled": false },
+  "url-rewrite": { "enabled": false, "rules": [] },
+  "ip-whitelist": { "enabled": false, "ips": [] },
+  "bot-detection": { "enabled": false, "blockBots": true },
+  "metrics": { "enabled": true },
+  "request-log": { "enabled": false },
+  "circuit-breaker": { "enabled": false, "failureThreshold": 5 },
+  "compression": { "enabled": false, "threshold": 1024 },
+  "cache": { "enabled": false, "ttl": 60 },
+  "quota": { "enabled": false, "quota": 1000, "window": "day" },
+  "request-size": { "enabled": false, "maxBodySize": 1048576 },
+  "timeout": { "enabled": false, "upstreamTimeout": 30000 },
+  "retry": { "enabled": false, "retries": 3 },
+  "load-balancer": { "enabled": false, "targets": [], "strategy": "round-robin" },
+  "websocket": { "enabled": false, "path": "/ws", "target": "" },
+  "request-validator": { "enabled": false, "schemas": {} },
+  "graphql-protection": { "enabled": false, "maxDepth": 10, "maxComplexity": 1000 },
+  "grpc-transcoder": { "enabled": false, "protoFile": "", "services": {} },
+  "distributed-trace": { "enabled": false, "serviceName": "apix-gateway", "sampleRate": 0.1 },
+  "canary-release": { "enabled": false, "weights": {} },
+  "ab-test": { "enabled": false, "experiments": {} },
+  "request-mirror": { "enabled": false, "mirrorTargets": [], "mirrorPercent": 0 },
+  "mock-response": { "enabled": false, "mocks": {}, "mockDir": "./mocks" },
+  "dynamic-routing": { "enabled": false, "rules": [], "defaultTarget": "" },
+  "service-discovery": { "enabled": false, "provider": "static", "services": {} },
+  "request-id": { "enabled": true, "headerName": "x-request-id", "generateFn": "uuid" },
+  "pagination": { "enabled": false, "defaultLimit": 20, "maxLimit": 100 },
+  "traffic-stats": { "enabled": false, "trackBy": "hour", "retention": 168 }
 }
