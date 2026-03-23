@@ -166,7 +166,7 @@ const validators = {
 };
 
 // Validation middleware factory
-const validate = (schema) => {
+export const validate = (schema) => {
   return (req, res, next) => {
     const errors = [];
     

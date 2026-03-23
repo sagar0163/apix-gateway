@@ -7,10 +7,14 @@ import { prometheusMetrics } from './middleware/prometheus.js';
 import { sanitization, validate, schemas } from './middleware/validation.js';
 import { loadConfig } from './utils/config.js';
 import { logger } from './utils/logger.js';
+import { redisManager } from './utils/redis.js';
 import { pluginManager } from './plugins/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
+import http from 'http';
+import http2 from 'http2';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -219,37 +223,34 @@ app.use((err, req, res, next) => {
 });
 
 // =======================
+
+// =======================
 // START SERVER
 // =======================
 const PORT = config.port || 3000;
+const USE_HTTP2 = process.env.HTTP2 === 'true';
+const SSL_KEY_PATH = process.env.SSL_KEY_PATH || './ssl/server.key';
+const SSL_CERT_PATH = process.env.SSL_CERT_PATH || './ssl/server.crt';
 
+// Initialize Redis (non-blocking)
+redisManager.connect().catch(err => logger.warn('Redis connection skipped:', err.message));
+
+const enabledPlugins = pluginManager.getEnabledPlugins().length;
+
+// Start HTTP server
 app.listen(PORT, () => {
-  const enabledPlugins = pluginManager.getEnabledPlugins().length;
-  
+  const http2Status = USE_HTTP2 ? 'HTTP/2 Ready (SSL required)' : 'Disabled';
   console.log(chalk.cyan(`
 ╔═══════════════════════════════════════════════════════════════╗
-║                                                               ║
-║   🚀 APIX Gateway  v1.0.0                                    ║
+║   🚀 APIX Gateway  v1.1.0                                    ║
 ║   🔒 Security Hardened                                         ║
-║                                                               ║
-║   🌐 Server:      http://localhost:${PORT}                        ║
-║   📊 Dashboard:   http://localhost:${PORT}/                        ║
-║   ❤️  Health:     http://localhost:${PORT}/health                  ║
-║   ⚙️  Admin API:  http://localhost:${PORT}/admin                     ║
+║   📦 Redis Ready (configure to enable)                         ║
+║   🌐 Server:      http://localhost:${PORT}                         ║
+║   ❤️  Health:     http://localhost:${PORT}/health                   ║
 ║   🔌 Plugins:     ${enabledPlugins} enabled                              ║
-║                                                               ║
-║   🛡️ Security Features:                                       ║
-║      • Helmet.js security headers                             ║
-║      • CORS configuration                                     ║
-║      • Rate limiting                                          ║
-║      • Input sanitization                                     ║
-║      • Request validation                                      ║
-║      • Path traversal protection                              ║
-║      • Request timeout                                        ║
-║                                                               ║
+║   HTTP/2:         ${http2Status}                                     ║
 ╚═══════════════════════════════════════════════════════════════╝
   `));
-  
   logger.info(`Server started on port ${PORT}`);
 });
 

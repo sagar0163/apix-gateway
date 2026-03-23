@@ -15,7 +15,7 @@ A modern, production-ready **API Gateway** built with Node.js - featuring rate l
 - **Reverse Proxy** - Dynamic routing to microservices
 - **Rate Limiting** - Configurable per-client limits
 - **Circuit Breaker** - Protect upstream services
-- **Load Balancer** - Round-robin, least-connections
+- **Load Balancer** - Round-robin, least-connections, ip-hash, latency, weighted + health checks
 - **Request Timeout** - Configurable upstream timeouts
 - **Automatic Retry** - Retry failed requests
 

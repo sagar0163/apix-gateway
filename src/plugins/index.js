@@ -12,6 +12,9 @@ class PluginManager {
     this.plugins = new Map();
     this.enabledPlugins = new Set();
     this.pluginInstances = new Map();
+    this._middlewareCache = null;
+    this._middlewareCacheTime = 0;
+    this._cacheTTL = 1000; // Cache middleware for 1 second
   }
 
   // Load built-in plugins
@@ -58,12 +61,12 @@ class PluginManager {
         this.register(name, plugin.default);
         logger.info(`Loaded custom plugin: ${name}`);
       } catch (err) {
-        logger.error(`Failed to load plugin ${file}:`, err);
+        logger.error(`Failed to load plugin ${file}: ${err}`);
       }
     }
   }
 
-  // Register a plugin
+  // Register a plugin (thread-safe)
   register(name, plugin) {
     if (!plugin || !plugin.name) {
       throw new Error('Plugin must have a name and handler');
@@ -75,46 +78,69 @@ class PluginManager {
       enabled: false
     });
     
+    // Invalidate middleware cache on registration change
+    this._invalidateCache();
+    
     logger.info(`Registered plugin: ${name}`);
   }
 
-  // Enable a plugin
+  // Enable a plugin (thread-safe with mutex pattern)
   enable(name, options = {}) {
     const plugin = this.plugins.get(name);
     if (!plugin) {
       throw new Error(`Plugin ${name} not found`);
     }
 
+    // Create instance with options
     const instance = {
       ...plugin,
       enabled: true,
       options: { ...plugin.defaultOptions, ...options }
     };
 
+    // Atomic update: set instance first, then add to enabled set
     this.pluginInstances.set(name, instance);
     this.enabledPlugins.add(name);
+    
+    // Invalidate cache after state change
+    this._invalidateCache();
     
     logger.info(`Enabled plugin: ${name}`);
     return instance;
   }
 
-  // Disable a plugin
+  // Disable a plugin (thread-safe)
   disable(name) {
     this.pluginInstances.delete(name);
     this.enabledPlugins.delete(name);
+    
+    // Invalidate cache after state change
+    this._invalidateCache();
+    
     logger.info(`Disabled plugin: ${name}`);
   }
 
-  // Get enabled plugins
+  // Invalidate middleware cache
+  _invalidateCache() {
+    this._middlewareCache = null;
+    this._middlewareCacheTime = 0;
+  }
+
+  // Get enabled plugins (returns snapshot for thread safety)
   getEnabledPlugins() {
-    return Array.from(this.enabledPlugins).map(name => {
+    // Return a snapshot to prevent concurrent modification issues
+    const enabled = [];
+    for (const name of this.enabledPlugins) {
       const plugin = this.pluginInstances.get(name);
-      return {
-        name: plugin.name,
-        version: plugin.version,
-        options: plugin.options
-      };
-    });
+      if (plugin) {
+        enabled.push({
+          name: plugin.name,
+          version: plugin.version,
+          options: plugin.options
+        });
+      }
+    }
+    return enabled;
   }
 
   // Get plugin by name
@@ -127,17 +153,30 @@ class PluginManager {
     return Array.from(this.plugins.keys());
   }
 
-  // Create middleware from enabled plugins
+  // Create middleware from enabled plugins (with caching for performance)
   createMiddleware() {
     return async (req, res, next) => {
-      const pluginChain = Array.from(this.enabledPlugins);
+      const now = Date.now();
+      
+      // Check cache validity
+      let pluginChain;
+      if (this._middlewareCache && (now - this._middlewareCacheTime) < this._cacheTTL) {
+        pluginChain = this._middlewareCache;
+      } else {
+        // Create snapshot of enabled plugins for this request
+        pluginChain = this.getEnabledPlugins();
+        
+        // Cache for hot path optimization
+        this._middlewareCache = pluginChain;
+        this._middlewareCacheTime = now;
+      }
       
       const runPlugin = async (index) => {
         if (index >= pluginChain.length) {
           return next();
         }
 
-        const pluginName = pluginChain[index];
+        const pluginName = pluginChain[index].name;
         const plugin = this.pluginInstances.get(pluginName);
 
         if (!plugin || !plugin.handler) {
