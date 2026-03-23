@@ -21,6 +21,7 @@ class PluginManager {
   async loadBuiltInPlugins() {
     const builtInPlugins = [
       'rate-limiter',
+      'sliding-window-rate-limiter',
       'jwt-auth',
       'api-key',
       'request-transformer',
