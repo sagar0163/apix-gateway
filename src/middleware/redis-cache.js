@@ -11,17 +11,17 @@ const initRedis = async () => {
     const Redis = (await import('redis')).default;
     const url = process.env.REDIS_URL || 'redis://localhost:6379';
     redis = Redis.createClient({ url });
-    
+
     redis.on('error', (err) => {
       logger.error('Redis error:', err.message);
       redisReady = false;
     });
-    
+
     redis.on('connect', () => {
       logger.info('Redis connected');
       redisReady = true;
     });
-    
+
     await redis.connect();
     return true;
   } catch (err) {
@@ -51,18 +51,18 @@ const generateKey = (options, req) => {
     req.path,
     JSON.stringify(req.query)
   ];
-  
+
   if (req.user?.id) {
     parts.push(req.user.id);
   }
-  
+
   return crypto.createHash('md5').update(parts.join(':')).digest('hex');
 };
 
 // Compress data
 const compress = async (data) => {
   if (!redis) return JSON.stringify(data);
-  
+
   try {
     const zlib = await import('zlib');
     const compressed = zlib.gzipSync(Buffer.from(JSON.stringify(data)));
@@ -82,9 +82,17 @@ const decompress = async (data) => {
       const decompressed = zlib.gunzipSync(buffer);
       return JSON.parse(decompressed.toString());
     }
-  } catch {}
-  
-  return typeof data === 'string' ? JSON.parse(data) : data;
+  } catch (err) {
+    logger.warn('Decompression failed, falling back to raw data:', err.message);
+  }
+
+  // Last resort: try to parse as JSON
+  try {
+    return typeof data === 'string' ? JSON.parse(data) : data;
+  } catch (parseErr) {
+    logger.error('Failed to parse cached data:', parseErr.message);
+    return null;
+  }
 };
 
 // Get from cache
@@ -99,20 +107,20 @@ const get = async (key) => {
       logger.error('Redis get error:', err.message);
     }
   }
-  
+
   // Fallback to memory
   const record = memoryCache.get(key);
   if (record && Date.now() < record.expiresAt) {
     return record.data;
   }
-  
+
   return null;
 };
 
 // Set cache
 const set = async (key, data, ttl) => {
   const serialized = await compress(data);
-  
+
   if (redisReady && redis) {
     try {
       await redis.setEx(key, ttl, serialized);
@@ -120,7 +128,7 @@ const set = async (key, data, ttl) => {
       logger.error('Redis set error:', err.message);
     }
   }
-  
+
   // Also set in memory as fallback
   memoryCache.set(key, {
     data,
@@ -138,7 +146,7 @@ const del = async (key) => {
       logger.error('Redis del error:', err.message);
     }
   }
-  
+
   memoryCache.delete(key);
 };
 
@@ -161,26 +169,26 @@ export const redisCache = (options = {}) => {
 
     // Try to get from cache
     const cached = await get(cacheKey);
-    
+
     if (cached) {
       logger.debug(`Cache HIT: ${cacheKey}`);
-      
+
       // Check if stale
       const record = memoryCache.get(cacheKey);
       const isStale = record && (Date.now() > record.expiresAt - config.staleTtl * 1000);
-      
+
       res.set('X-Cache', isStale ? 'STALE' : 'HIT');
-      
+
       // Return cached response
       if (!isStale || !config.staleWhileRevalidate) {
         return res.status(200).json(cached);
       }
-      
+
       // Stale-while-revalidate: return cached + refresh in background
       if (config.staleWhileRevalidate && redis) {
         // Fire and forget - will update cache
         next();
-        
+
         // Add to queue for background refresh
         return res.status(200).json(cached);
       }
@@ -191,14 +199,14 @@ export const redisCache = (options = {}) => {
 
     // Capture response
     const originalJson = res.json.bind(res);
-    
+
     res.json = async (data) => {
       // Only cache successful responses
       if (res.statusCode >= 200 && res.statusCode < 300 && data) {
         await set(cacheKey, data, config.ttl);
         logger.debug(`Cache SET: ${cacheKey}`);
       }
-      
+
       originalJson(data);
     };
 
@@ -219,7 +227,7 @@ export const invalidateCache = async (pattern) => {
       logger.error('Cache invalidation error:', err.message);
     }
   }
-  
+
   // Also clear matching memory cache
   for (const key of memoryCache.keys()) {
     if (key.includes(pattern)) {
@@ -231,7 +239,7 @@ export const invalidateCache = async (pattern) => {
 // Get cache stats
 export const getCacheStats = async () => {
   let redisStats = null;
-  
+
   if (redisReady && redis) {
     try {
       const info = await redis.info('stats');
@@ -241,7 +249,7 @@ export const getCacheStats = async () => {
       redisStats = { connected: false, error: err.message };
     }
   }
-  
+
   return {
     redis: redisStats,
     memory: {
@@ -264,7 +272,7 @@ export const clearCache = async () => {
       logger.error('Clear cache error:', err.message);
     }
   }
-  
+
   memoryCache.clear();
   logger.info('Cache cleared');
 };
