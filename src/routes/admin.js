@@ -1,5 +1,6 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { loadConfig } from '../utils/config.js';
 import { pluginManager } from '../plugins/index.js';
 import { rateLimiter } from '../middleware/rate-limiter.js';
@@ -41,39 +42,62 @@ const requireAdmin = (req, res, next) => {
 // =======================
 
 // Login with rate limiting
-router.post('/login', 
-  rateLimiter.create({ 
-    windowMs: 60000, 
+router.post('/login',
+  rateLimiter.create({
+    windowMs: 60000,
     maxRequests: 5,
     skip: (req) => req.ip === '127.0.0.1'
   }),
   validate(schemas.login),
   (req, res) => {
     const { username, password } = req.body;
-    
-    // In production, use database
-    const validUsers = {
-      admin: { password: 'admin123', role: 'admin' },
-      developer: { password: 'dev123', role: 'developer' }
+
+    // Load users from environment variable (JSON format) or use default
+    const getUsersFromEnv = () => {
+      const envUsers = process.env.ADMIN_USERS;
+      if (envUsers) {
+        try {
+          return JSON.parse(envUsers);
+        } catch (e) {
+          logger.error('Failed to parse ADMIN_USERS environment variable');
+        }
+      }
+      // Default users - MUST be changed in production
+      return {
+        admin: {
+          password: process.env.ADMIN_PASSWORD || 'CHANGE_ME_IN_PRODUCTION',
+          role: 'admin'
+        },
+        developer: {
+          password: process.env.DEVELOPER_PASSWORD || 'CHANGE_ME_IN_PRODUCTION',
+          role: 'developer'
+        }
+      };
     };
-    
+
+    const validUsers = getUsersFromEnv();
     const user = validUsers[username];
-    
+
+    if (!user || user.password === 'CHANGE_ME_IN_PRODUCTION') {
+      logger.warn(`Login attempt with unchanged default password for user: ${username} from ${req.ip}`);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
     if (!user || user.password !== password) {
       logger.warn(`Login failed for user: ${username} from ${req.ip}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    
+
     const token = jwt.sign(
       { id: username, role: user.role },
       config.jwt.secret,
       { expiresIn: config.jwt.expiresIn }
     );
-    
-    logger.info(`User ${username} logged in from ${req.ip}`);
-    
-    res.json({ 
-      token, 
+
+    logger.info(`User ${username} logged in from ${req.ip}`, { audit: true, action: 'login' });
+
+    res.json({
+      token,
       role: user.role,
       expiresIn: config.jwt.expiresIn
     });
@@ -88,7 +112,7 @@ router.post('/login',
 router.get('/stats', authenticate, (req, res) => {
   const mem = process.memoryUsage();
   const cpu = process.cpuUsage();
-  
+
   res.json({
     uptime: process.uptime(),
     memory: {
@@ -112,7 +136,7 @@ router.get('/stats', authenticate, (req, res) => {
 // Detailed health
 router.get('/health', authenticate, (req, res) => {
   const mem = process.memoryUsage();
-  
+
   res.json({
     status: 'healthy',
     uptime: process.uptime(),
@@ -189,7 +213,7 @@ router.post('/circuits/:service/reset', authenticate, (req, res) => {
   const cb = pluginManager.getPlugin('circuit-breaker');
   if (cb && cb.reset) {
     cb.reset(req.params.service);
-    logger.info(`Circuit reset for ${req.params.service} by ${req.user.id}`);
+    logger.info(`Circuit reset for ${req.params.service} by ${req.user.id}`, { audit: true, action: 'resetCircuit', userId: req.user.id, service: req.params.service });
     res.json({ success: true, message: `Circuit reset for ${req.params.service}` });
   } else {
     res.json({ error: 'Circuit breaker plugin not enabled' });
@@ -214,12 +238,12 @@ router.post('/keys', authenticate, validate(schemas.createApiKey), (req, res) =>
   if (ak && ak.addKey) {
     const { name, rateLimit, expiresIn } = req.body;
     const key = 'apix_' + crypto.randomBytes(16).toString('hex');
-    ak.addKey(key, { 
+    ak.addKey(key, {
       name: name || 'Unnamed',
       rateLimit,
       expiresAt: expiresIn ? Date.now() + expiresIn * 1000 : null
     });
-    logger.info(`API key created: ${name} by ${req.user.id}`);
+    logger.info(`API key created: ${name} by ${req.user.id}`, { audit: true, action: 'createApiKey', userId: req.user.id, keyName: name });
     res.json({ key, name, rateLimit, expiresIn });
   } else {
     res.status(400).json({ error: 'API key plugin not enabled' });
@@ -230,7 +254,7 @@ router.delete('/keys/:key', authenticate, (req, res) => {
   const ak = pluginManager.getPlugin('api-key');
   if (ak && ak.removeKey) {
     ak.removeKey(req.params.key);
-    logger.info(`API key deleted: ${req.params.key.slice(0, 8)}... by ${req.user.id}`);
+    logger.info(`API key deleted: ${req.params.key.slice(0, 8)}... by ${req.user.id}`, { audit: true, action: 'deleteApiKey', userId: req.user.id });
     res.json({ success: true });
   } else {
     res.status(400).json({ error: 'API key plugin not enabled' });
@@ -244,7 +268,7 @@ router.delete('/keys/:key', authenticate, (req, res) => {
 router.get('/plugins', authenticate, (req, res) => {
   const allPlugins = pluginManager.list();
   const enabled = pluginManager.getEnabledPlugins();
-  
+
   res.json({
     available: allPlugins,
     enabled,
@@ -263,7 +287,7 @@ router.get('/plugins/:name', authenticate, (req, res) => {
 router.post('/plugins/:name/enable', authenticate, requireAdmin, (req, res) => {
   const { name } = req.params;
   const { options } = req.body;
-  
+
   try {
     pluginManager.enable(name, options || {});
     logger.info(`Plugin enabled: ${name} by ${req.user.id}`);
@@ -297,9 +321,19 @@ router.get('/security/blocked', authenticate, requireAdmin, (req, res) => {
 // Unblock IP
 router.post('/security/unblock', authenticate, requireAdmin, (req, res) => {
   const { ip } = req.body;
+
   if (!ip) {
     return res.status(400).json({ error: 'IP address required' });
   }
+
+  // Validate IP address format
+  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+  const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+
+  if (!ipv4Regex.test(ip) && !ipv6Regex.test(ip)) {
+    return res.status(400).json({ error: 'Invalid IP address format' });
+  }
+
   unblockIP(ip);
   logger.info(`IP unblocked: ${ip} by ${req.user.id}`);
   res.json({ success: true, message: `IP ${ip} unblocked` });
