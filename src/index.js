@@ -238,11 +238,12 @@ redisManager.connect().catch(err => logger.warn('Redis connection skipped:', err
 const enabledPlugins = pluginManager.getEnabledPlugins().length;
 
 // Start HTTP server
-app.listen(PORT, () => {
+let server;
+server = app.listen(PORT, () => {
   const http2Status = USE_HTTP2 ? 'HTTP/2 Ready (SSL required)' : 'Disabled';
   console.log(chalk.cyan(`
 ╔═══════════════════════════════════════════════════════════════╗
-║   🚀 APIX Gateway  v1.1.0                                    ║
+║   🚀 APIX Gateway  v1.2.0                                    ║
 ║   🔒 Security Hardened                                         ║
 ║   📦 Redis Ready (configure to enable)                         ║
 ║   🌐 Server:      http://localhost:${PORT}                         ║
@@ -252,6 +253,56 @@ app.listen(PORT, () => {
 ╚═══════════════════════════════════════════════════════════════╝
   `));
   logger.info(`Server started on port ${PORT}`);
+});
+
+// =======================
+// GRACEFUL SHUTDOWN
+// =======================
+const gracefulShutdown = (signal) => {
+  logger.info(`${signal} received, starting graceful shutdown...`);
+  
+  // Stop accepting new connections
+  server.close(() => {
+    logger.info('HTTP server closed');
+    
+    // Stop health checks
+    if (pluginManager.getPlugin('load-balancer')) {
+      pluginManager.getPlugin('load-balancer').stopHealthCheck();
+      logger.info('Health checks stopped');
+    }
+    
+    // Close Redis connection
+    redisManager.disconnect().then(() => {
+      logger.info('Redis connection closed');
+    }).catch(err => {
+      logger.warn('Redis disconnect error:', err.message);
+    });
+    
+    // Give time for cleanup
+    setTimeout(() => {
+      logger.info('Graceful shutdown complete');
+      process.exit(0);
+    }, 5000);
+  });
+  
+  // Force exit after timeout
+  setTimeout(() => {
+    logger.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 30000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception:', err);
+  gracefulShutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled rejection at:', promise, 'reason:', reason);
 });
 
 export default app;
