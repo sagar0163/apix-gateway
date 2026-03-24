@@ -5,14 +5,50 @@ import config from '../config/index.js';
 
 const router = express.Router();
 
+// Connection pool agents (lazy initialized)
+let httpAgent = null;
+let httpsAgent = null;
+
+// Initialize connection pool
+const getHttpAgent = () => {
+  if (!httpAgent) {
+    const http = require('http');
+    httpAgent = new http.Agent({
+      maxSockets: 100,
+      maxFreeSockets: 10,
+      timeout: 60000,
+      keepAlive: true,
+      keepAliveMsecs: 30000,
+      scheduling: 'lifo'
+    });
+  }
+  return httpAgent;
+};
+
+const getHttpsAgent = () => {
+  if (!httpsAgent) {
+    const https = require('https');
+    httpsAgent = new https.Agent({
+      maxSockets: 100,
+      maxFreeSockets: 10,
+      timeout: 60000,
+      keepAlive: true,
+      keepAliveMsecs: 30000,
+      scheduling: 'lifo',
+      rejectUnauthorized: false  // Configure based on needs
+    });
+  }
+  return httpsAgent;
+};
+
 // Header sanitization to prevent injection attacks
 const sanitizeHeaders = (headers) => {
   const sanitized = { ...headers };
   const dangerousPatterns = [
-    /\r\n/gi,      // CRLF injection
-    /\x0d\x0a/gi,  // Raw CR LF
-    /\x0a/gi,      // LF only
-    /\x0d/gi       // CR only
+    /\r\n/gi,
+    /\x0d\x0a/gi,
+    /\x0a/gi,
+    /\x0d/gi
   ];
   
   for (const [key, value] of Object.entries(sanitized)) {
@@ -21,7 +57,6 @@ const sanitizeHeaders = (headers) => {
       for (const pattern of dangerousPatterns) {
         sanitizedValue = sanitizedValue.replace(pattern, '');
       }
-      // Reject headers with injection attempts
       if (sanitizedValue !== value) {
         logger.warn(`Blocked header injection attempt: ${key}`);
         delete sanitized[key];
@@ -31,7 +66,7 @@ const sanitizeHeaders = (headers) => {
     }
   }
   
-  // Remove hop-by-hop headers that shouldn't be forwarded
+  // Remove hop-by-hop headers
   delete sanitized['connection'];
   delete sanitized['keep-alive'];
   delete sanitized['proxy-authenticate'];
@@ -55,7 +90,7 @@ const getApiDefinition = (path) => {
   return null;
 };
 
-// Dynamic proxy handler
+// Dynamic proxy handler with connection pooling
 router.use('/', async (req, res, next) => {
   const api = getApiDefinition(req.path);
   
@@ -63,46 +98,79 @@ router.use('/', async (req, res, next) => {
     return res.status(404).json({ error: 'API not found' });
   }
   
+  // Determine if target uses HTTPS
+  const targetUrl = new URL(api.target);
+  const isHttps = targetUrl.protocol === 'https:';
+  
   const proxy = createProxyMiddleware({
     target: api.target,
     changeOrigin: true,
+    // Use connection pooling
+    agent: isHttps ? getHttpsAgent() : getHttpAgent(),
+    // Timeout settings
+    proxyTimeout: 30000,
+    timeout: 30000,
+    // Retry configuration
+    retry: {
+      retries: 3,
+      retryDelay: 100,
+      retryOn: [502, 503, 504, 408, ECONNREFUSED]
+    },
     pathRewrite: {
       [`^/api${api.prefix}`]: ''
     },
     onProxyReq: (proxyReq, req) => {
-      logger.info(`Proxying to ${api.target}${req.path}`);
+      logger.debug(`Proxying to ${api.target}${req.path}`);
       
-      // Sanitize all incoming headers before forwarding
       const sanitizedHeaders = sanitizeHeaders(req.headers);
       
-      // Set sanitized headers (except host)
       for (const [key, value] of Object.entries(sanitizedHeaders)) {
         if (key !== 'host') {
           proxyReq.setHeader(key, value);
         }
       }
       
-      // Add user identification if available
       if (req.user) {
         proxyReq.setHeader('X-User-Id', req.user.id);
         proxyReq.setHeader('X-User-Role', req.user.role || 'unknown');
       }
       
-      // Add request tracking
       proxyReq.setHeader('X-Forwarded-For', req.ip);
       proxyReq.setHeader('X-Gateway-Request-Id', req.id || `req-${Date.now()}`);
+      // Indicate this is a proxied request
+      proxyReq.setHeader('X-Proxy-By', 'apix-gateway');
     },
     onProxyRes: (proxyRes, req, res) => {
-      // Clean up problematic headers from upstream
       delete proxyRes.headers['www-authenticate'];
+      // Add response timing header
+      const proxyLatency = proxyRes.headers['x-response-time'];
+      if (proxyLatency) {
+        res.set('X-Upstream-Latency', proxyLatency);
+      }
     },
     onError: (err, req, res) => {
-      logger.error('Proxy error', { error: err.message, code: err.code });
-      res.status(502).json({ error: 'Bad gateway', message: 'Upstream service unavailable' });
+      logger.error('Proxy error', { error: err.message, code: err.code, target: api.target });
+      res.status(502).json({ 
+        error: 'Bad gateway', 
+        message: 'Upstream service unavailable',
+        code: err.code
+      });
     }
   });
   
   proxy(req, res, next);
+});
+
+// Health check endpoint for proxy
+router.get('/health/upstreams', (req, res) => {
+  const apis = config.apis || {};
+  res.json({
+    upstreams: Object.entries(apis).map(([prefix, target]) => ({
+      prefix,
+      target,
+      healthy: true  // Could integrate with load balancer health checks
+    }))
+  });
 });
 
 export default router;
