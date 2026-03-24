@@ -26,17 +26,17 @@ export default {
   // Get Redis key for client
   _getRedisKey(key, windowId) {
     return `${this.options.keyPrefix}${key}:${windowId}`;
-  }
+  },
 
   // Calculate current window ID
   _getCurrentWindowId() {
     return Math.floor(Date.now() / 1000 / this.options.windowSize);
-  }
+  },
 
   // Get previous window ID (for sliding calculation)
   _getPreviousWindowId() {
     return this._getCurrentWindowId() - 1;
-  }
+  },
 
   // Calculate sliding window count using Redis Lua script
   async _getSlidingWindowCount(clientKey) {
@@ -79,7 +79,7 @@ export default {
     // Fallback to simple current window count
     const current = await redisManager.get(clientKey) || 0;
     return { current: parseInt(current), previous: 0, estimate: parseInt(current) };
-  }
+  },
 
   // Increment counter in Redis
   async _incrementRedis(clientKey) {
@@ -88,7 +88,7 @@ export default {
     
     const count = await redisManager.increment(key, this.options.redisKeyTTL);
     return count;
-  }
+  },
 
   // In-memory fallback (non-blocking)
   _checkInMemory(key) {
@@ -145,7 +145,7 @@ export default {
       remaining: Math.max(0, this.options.maxRequests - record.count),
       resetTime: record.windowStart + windowMs
     };
-  }
+  },
 
   // Main handler
   async handle(req, res, next) {
