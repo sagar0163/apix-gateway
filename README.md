@@ -1,7 +1,7 @@
 # 🚀 APIX Gateway
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.2.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/node-18%2B-orange" alt="Node">
   <img src="https://img.shields.io/badge/express-4.x-red" alt="Express">
@@ -322,6 +322,38 @@ docker run -p 3000:3000 -v ./plugins.json:/app/plugins.json apix-gateway
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+## 📝 Changelog
+
+### v1.2.0 (2026-03-24)
+
+#### Load Balancer Improvements
+- **Separate infra-level vs app-level health tracking** - Health checks now track infrastructure reachability separately from request-level success/failure
+- **Route/cohort-level metrics** - Track failures by route, geo, and endpoint for granular visibility
+- **Consistent hashing with virtual nodes** - Better sticky session distribution when targets change
+- **Conservative recovery with cooldown** - Prevents rapid flapping between healthy/unhealthy states
+
+#### Retry Improvements  
+- **Jitter** - Random delay added to prevent thundering herd
+- **Exponential backoff** - Configurable backoff strategy
+- **Load balancer coordination** - Track retries per target for better metrics
+- **Retry headers** - X-Retry-Count, X-Retry-Target for debugging
+
+#### Reliability
+- **Graceful shutdown** - SIGTERM/SIGINT handling for zero-dropped requests
+- **Connection pooling** - HTTP/HTTPS keep-alive for upstream connections
+- **Request timeouts** - Configurable 30s proxy timeout
+
+#### Observability
+- **Distributed tracing** - OpenTelemetry-style trace context propagation
+- **W3C traceparent** - Standard trace context format support
+- **Enhanced metrics** - More detailed health and performance data
+
+### v1.1.0 (2026-03-23)
+- Add sliding window rate limiter with Redis backend
+- Security & performance fixes
 
 ---
 
