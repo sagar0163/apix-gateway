@@ -94,7 +94,7 @@ export default {
       metrics.latency.min = Math.min(metrics.latency.min, latency);
       metrics.latency.max = Math.max(metrics.latency.max, latency);
 
-      return originalSend(body);
+      return originalSend.call(res, body);
     };
 
     next();
