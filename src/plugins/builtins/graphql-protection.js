@@ -43,11 +43,11 @@ export default {
         case 'Field':
           const baseCost = options.complexityCosts[node.name?.value] || options.defaultCost;
           complexity += baseCost;
-          
+
           if (node.arguments?.length > options.maxAliases) {
             return { valid: false, reason: 'too many arguments' };
           }
-          
+
           if (node.selectionSet) {
             for (const sel of node.selectionSet.selections) {
               const result = traverse(sel, depth + 1);
@@ -82,7 +82,7 @@ export default {
     return body?.includes('__schema') || body?.includes('__type');
   },
 
-  handler: (req, res, next) => {
+  handler(req, res, next) {
     const options = req._pluginOptions?.['graphql-protection'] || DEFAULT_OPTIONS;
 
     // Only apply to GraphQL endpoints
@@ -97,14 +97,16 @@ export default {
       if (contentType.includes('application/json')) {
         try {
           const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-          if (this.isIntrospectionQuery(JSON.stringify(body.query))) {
+          if (graphqlProtection.isIntrospectionQuery(JSON.stringify(body.query))) {
             logger.warn('Introspection query blocked');
             return res.status(400).json({
               error: 'Bad Request',
               message: 'Introspection queries are disabled'
             });
           }
-        } catch {}
+        } catch (err) {
+          logger.warn('Failed to check introspection query:', err.message);
+        }
       }
     }
 
