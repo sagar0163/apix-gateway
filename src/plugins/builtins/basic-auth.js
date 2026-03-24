@@ -36,19 +36,20 @@ export default {
   decodeBase64(str) {
     try {
       return Buffer.from(str, 'base64').toString('utf8');
-    } catch {
+    } catch (err) {
+      logger.warn('Base64 decode failed:', err.message);
       return '';
     }
   },
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['basic-auth'] || DEFAULT_OPTIONS;
-    
+
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Basic ')) {
       res.set('WWW-Authenticate', 'Basic realm="API"');
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Unauthorized',
         message: 'Basic authentication required'
       });
@@ -56,7 +57,15 @@ export default {
 
     const base64Credentials = authHeader.slice(6);
     const decoded = this.decodeBase64(base64Credentials);
-    const [username, password] = decoded.split(':');
+
+    // Split only on FIRST colon to handle passwords containing colons
+    const colonIndex = decoded.indexOf(':');
+    if (colonIndex === -1) {
+      return res.status(401).json({ error: 'Invalid credentials format' });
+    }
+
+    const username = decoded.slice(0, colonIndex);
+    const password = decoded.slice(colonIndex + 1);
 
     if (!username || !password) {
       return res.status(401).json({ error: 'Invalid credentials format' });
@@ -64,7 +73,7 @@ export default {
 
     // Check user
     const user = users.get(username);
-    
+
     if (!user || user.password !== password) {
       logger.warn(`Basic auth failed for user: ${username}`);
       return res.status(401).json({ error: 'Invalid credentials' });
