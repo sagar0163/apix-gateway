@@ -27,7 +27,7 @@ class PluginManager {
       'request-transformer',
       'response-transformer',
       'ip-whitelist',
-      ' cors',
+      'cors',
       'compression',
       'metrics',
       'circuit-breaker'
