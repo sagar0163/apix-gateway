@@ -303,9 +303,9 @@ export default {
         break;
 
       case 'latency':
-        target = healthyTargets.reduce((min, t => 
+        target = healthyTargets.reduce((min, t) => 
           t.latency < min.latency ? t : min
-        ));
+        );
         break;
 
       case 'weighted':
