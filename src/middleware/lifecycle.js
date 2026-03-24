@@ -1,5 +1,6 @@
 // Graceful Shutdown Handler
 import { logger } from '../utils/logger.js';
+import crypto from 'crypto';
 
 // Store for cleanup functions
 const cleanupFunctions = [];
@@ -134,7 +135,7 @@ export const healthCheck = (options = {}) => {
 export const requestId = (options = {}) => {
   const {
     headerName = 'x-request-id',
-    generator = () => require('crypto').randomUUID()
+    generator = () => crypto.randomUUID()
   } = options;
 
   return (req, res, next) => {
