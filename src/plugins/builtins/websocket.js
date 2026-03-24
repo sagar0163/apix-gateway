@@ -1,5 +1,5 @@
 // WebSocket Proxy Plugin
-import { WebSocketServer } from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import { logger } from '../../utils/logger.js';
 
 const DEFAULT_OPTIONS = {
@@ -28,7 +28,7 @@ export default {
       logger.info(`WebSocket client connected: ${clientIp}`);
 
       // Create upstream connection
-      const upstream = new (require('ws'))(options.target, {
+      const upstream = new WebSocket(options.target, {
         headers: {
           ...req.headers,
           'x-forwarded-for': clientIp
