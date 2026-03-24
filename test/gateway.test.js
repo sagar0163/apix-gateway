@@ -2,8 +2,9 @@
  * Unit tests for API Gateway
  */
 
-const request = require('supertest');
-const app = require('./src/index');
+import { describe, it, expect } from 'vitest';
+import request from 'supertest';
+import app from '../src/index.js';
 
 describe('API Gateway', () => {
   describe('GET /health', () => {
