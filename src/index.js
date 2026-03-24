@@ -15,6 +15,8 @@ import chalk from 'chalk';
 import http from 'http';
 import http2 from 'http2';
 import fs from 'fs';
+import adminRoutes from './routes/admin.js';
+import proxyRoutes from './routes/proxy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -162,7 +164,7 @@ await initPlugins();
 // =======================
 // ADMIN API
 // =======================
-app.use('/admin', require('./routes/admin.js'));
+app.use('/admin', adminRoutes);
 
 // Admin validation middleware
 const adminValidate = validate(schemas);
@@ -177,7 +179,7 @@ app.use(pluginManager.createMiddleware());
 // =======================
 // API ROUTES
 // =======================
-app.use('/api', require('./routes/proxy.js'));
+app.use('/api', proxyRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -238,68 +240,77 @@ redisManager.connect().catch(err => logger.warn('Redis connection skipped:', err
 const enabledPlugins = pluginManager.getEnabledPlugins().length;
 
 // Start HTTP server
-let server;
-server = app.listen(PORT, () => {
-  const http2Status = USE_HTTP2 ? 'HTTP/2 Ready (SSL required)' : 'Disabled';
-  console.log(chalk.cyan(`
-╔═══════════════════════════════════════════════════════════════╗
-║   🚀 APIX Gateway  v1.2.0                                    ║
-║   🔒 Security Hardened                                         ║
-║   📦 Redis Ready (configure to enable)                         ║
-║   🌐 Server:      http://localhost:${PORT}                         ║
-║   ❤️  Health:     http://localhost:${PORT}/health                   ║
-║   🔌 Plugins:     ${enabledPlugins} enabled                              ║
-║   HTTP/2:         ${http2Status}                                     ║
-╚═══════════════════════════════════════════════════════════════╝
-  `));
-  logger.info(`Server started on port ${PORT}`);
-});
+const start = () => {
+  const server = app.listen(PORT, () => {
+    const http2Status = USE_HTTP2 ? 'HTTP/2 Ready (SSL required)' : 'Disabled';
+    console.log(chalk.cyan(`
+  ╔═══════════════════════════════════════════════════════════════╗
+  ║   🚀 APIX Gateway  v1.2.0                                    ║
+  ║   🔒 Security Hardened                                         ║
+  ║   📦 Redis Ready (configure to enable)                         ║
+  ║   🌐 Server:      http://localhost:${PORT}                         ║
+  ║   ❤️  Health:     http://localhost:${PORT}/health                   ║
+  ║   🔌 Plugins:     ${enabledPlugins} enabled                              ║
+  ║   HTTP/2:         ${http2Status}                                     ║
+  ╚═══════════════════════════════════════════════════════════════╝
+    `));
+    logger.info(`Server started on port ${PORT}`);
+  });
 
-// =======================
-// GRACEFUL SHUTDOWN
-// =======================
-const gracefulShutdown = (signal) => {
-  logger.info(`${signal} received, starting graceful shutdown...`);
-  
-  // Stop accepting new connections
-  server.close(() => {
-    logger.info('HTTP server closed');
+  // =======================
+  // GRACEFUL SHUTDOWN
+  // =======================
+  const gracefulShutdown = (signal) => {
+    logger.info(`${signal} received, starting graceful shutdown...`);
     
-    // Stop health checks
-    if (pluginManager.getPlugin('load-balancer')) {
-      pluginManager.getPlugin('load-balancer').stopHealthCheck();
-      logger.info('Health checks stopped');
-    }
-    
-    // Close Redis connection
-    redisManager.disconnect().then(() => {
-      logger.info('Redis connection closed');
-    }).catch(err => {
-      logger.warn('Redis disconnect error:', err.message);
+    // Stop accepting new connections
+    server.close(() => {
+      logger.info('HTTP server closed');
+      
+      // Stop health checks
+      if (pluginManager.getPlugin('load-balancer')) {
+        pluginManager.getPlugin('load-balancer').stopHealthCheck();
+        logger.info('Health checks stopped');
+      }
+      
+      // Close Redis connection
+      redisManager.disconnect().then(() => {
+        logger.info('Redis connection closed');
+      }).catch(err => {
+        logger.warn('Redis disconnect error:', err.message);
+      });
+      
+      // Give time for cleanup
+      setTimeout(() => {
+        logger.info('Graceful shutdown complete');
+        process.exit(0);
+      }, 5000);
     });
     
-    // Give time for cleanup
+    // Force exit after timeout
     setTimeout(() => {
-      logger.info('Graceful shutdown complete');
-      process.exit(0);
-    }, 5000);
-  });
+      logger.error('Forced shutdown after timeout');
+      process.exit(1);
+    }, 30000);
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
   
-  // Force exit after timeout
-  setTimeout(() => {
-    logger.error('Forced shutdown after timeout');
-    process.exit(1);
-  }, 30000);
+  // Handle uncaught exceptions
+  process.on('uncaughtException', (err) => {
+    logger.error('Uncaught exception:', err);
+    gracefulShutdown('uncaughtException');
+  });
+
+  return server;
 };
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  logger.error('Uncaught exception:', err);
-  gracefulShutdown('uncaughtException');
-});
+// Check if run directly
+const isMain = import.meta.url === `file://${path.resolve(process.argv[1])}`;
+if (isMain && process.env.NODE_ENV !== 'test') {
+  start();
+}
 
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled rejection at:', promise, 'reason:', reason);
