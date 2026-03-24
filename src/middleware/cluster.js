@@ -3,11 +3,12 @@ import { logger } from '../utils/logger.js';
 import http from 'http';
 import https from 'https';
 import { EventEmitter } from 'events';
+import os from 'os';
 
 // Cluster configuration
 const DEFAULT_OPTIONS = {
   enabled: false,
-  workers: require('os').cpus().length,
+  workers: os.cpus().length,
   port: 3000,
   host: '0.0.0.0',
   spread: true, // Distribute load evenly
