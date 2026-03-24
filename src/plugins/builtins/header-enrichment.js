@@ -1,5 +1,6 @@
 // Header Enrichment Plugin
 import { logger } from '../../utils/logger.js';
+import crypto from 'crypto';
 
 const DEFAULT_OPTIONS = {
   addRequestHeaders: {},
@@ -31,7 +32,7 @@ export default {
           .replace('${http_host}', req.headers.host || '')
           .replace('${request_method}', req.method)
           .replace('${request_path}', req.path)
-          .replace('${request_id}', req.headers['x-request-id'] || require('crypto').randomUUID());
+          .replace('${request_id}', req.headers['x-request-id'] || crypto.randomUUID());
       }
       req.headers[key.toLowerCase()] = finalValue;
     }
