@@ -1,5 +1,6 @@
 // Performance Optimization Middleware
 import { logger } from '../utils/logger.js';
+import zlib from 'zlib';
 
 // In-memory cache for responses
 const responseCache = new Map();
@@ -11,10 +12,7 @@ const cacheConfig = {
   compressionThreshold: parseInt(process.env.CACHE_COMPRESS_THRESHOLD || '1024')
 };
 
-// Gzip compression (lazy loaded)
-let zlib;
 const getZlib = () => {
-  if (!zlib) zlib = require('zlib');
   return zlib;
 };
 
