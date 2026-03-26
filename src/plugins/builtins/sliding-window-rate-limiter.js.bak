@@ -90,7 +90,38 @@ export default {
     return count;
   },
 
-
+  // In-memory fallback (non-blocking)
+  _checkInMemory(key) {
+    const now = Date.now();
+    const windowMs = this.options.windowSize * 1000;
+    
+    let record = inMemoryStore.get(key);
+    
+    if (!record || now - record.windowStart > windowMs) {
+      record = {
+        count: 0,
+        windowStart: now
+      };
+      inMemoryStore.set(key, record);
+    }
+    
+    record.count++;
+    
+    // Cleanup old entries periodically
+    if (inMemoryStore.size > 10000) {
+      for (const [k, v] of inMemoryStore.entries()) {
+        if (now - v.windowStart > windowMs * 2) {
+          inMemoryStore.delete(k);
+        }
+      }
+    }
+    
+    return {
+      count: record.count,
+      remaining: Math.max(0, this.options.maxRequests - record.count),
+      resetTime: record.windowStart + windowMs
+    };
+  }
 
   // In-memory increment
   _incrementInMemory(key) {
