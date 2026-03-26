@@ -41,6 +41,10 @@ const sanitizeObject = (obj) => {
   if (typeof obj === 'object') {
     const sanitized = {};
     for (const [key, value] of Object.entries(obj)) {
+      // Prevent prototype pollution
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        continue;
+      }
       // Sanitize key
       const sanitizedKey = sanitizeString(key);
       sanitized[sanitizedKey] = sanitizeObject(value);
