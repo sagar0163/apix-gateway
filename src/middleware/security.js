@@ -96,7 +96,11 @@ const ipValidation = (req, res, next) => {
     });
     
     if (hasPrivateIP && process.env.NODE_ENV === 'production') {
-      logger.warn('Private IP in X-Forwarded-For blocked');
+      logger.warn(`Private IP spoofing attempt blocked: ${forwardedFor}`);
+      return res.status(403).json({ 
+        error: 'Forbidden', 
+        message: 'Direct access from private networks is not allowed' 
+      });
     }
   }
   
@@ -185,12 +189,14 @@ const requestTimeout = parseInt(process.env.REQUEST_TIMEOUT || '30000');
 
 const timeoutMiddleware = (req, res, next) => {
   res.setTimeout(requestTimeout, () => {
-    logger.error(`Request timeout: ${req.method} ${req.path}`);
-    res.status(408).json({
-      error: 'Request Timeout',
-      message: 'Request took too long to process'
-    });
-    res.end();
+    if (!res.headersSent) {
+      logger.error(`Request timeout: ${req.method} ${req.path}`);
+      res.status(408).json({
+        error: 'Request Timeout',
+        message: 'Request took too long to process'
+      });
+      res.end();
+    }
   });
   next();
 };
