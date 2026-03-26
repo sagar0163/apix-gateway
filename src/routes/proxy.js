@@ -11,6 +11,10 @@ const router = express.Router();
 let httpAgent = null;
 let httpsAgent = null;
 
+// Cache for proxy middleware instances to prevent memory leaks and performance overhead
+const proxyCache = new Map();
+const PROXY_CACHE_TTL = 3600000; // 1 hour
+
 // Initialize connection pool
 const getHttpAgent = () => {
   if (!httpAgent) {
@@ -91,7 +95,7 @@ const getApiDefinition = (path) => {
   return null;
 };
 
-// Dynamic proxy handler with connection pooling
+// Dynamic proxy handler with connection pooling and middleware caching
 router.use('/', async (req, res, next) => {
   const api = getApiDefinition(req.path);
 
@@ -103,89 +107,93 @@ router.use('/', async (req, res, next) => {
   let target = api.target;
   if (req._target) {
     target = req._target;
-    logger.debug(`Using load balancer selected target: ${target}`);
   }
 
-  // Determine if target uses HTTPS
-  const targetUrl = new URL(target);
-  const isHttps = targetUrl.protocol === 'https:';
+  // Create cache key based on target and prefix
+  const cacheKey = `${api.prefix}:${target}`;
+  let proxy = proxyCache.get(cacheKey);
 
-  const proxy = createProxyMiddleware({
-    target,
-    changeOrigin: true,
-    // Use connection pooling
-    agent: isHttps ? getHttpsAgent() : getHttpAgent(),
-    // Timeout settings
-    proxyTimeout: 30000,
-    timeout: 30000,
-    // Retry configuration
-    retry: {
-      retries: 3,
-      retryDelay: 100,
-      retryOn: [502, 503, 504, 408, 'ECONNREFUSED']
-    },
-    pathRewrite: {
-      [`^${api.prefix}`]: ''
-    },
-    onProxyReq: (proxyReq, req) => {
-      logger.debug(`Proxying to ${api.target}${req.path}`);
+  if (!proxy) {
+    logger.info(`Creating new proxy instance for ${cacheKey}`);
+    
+    // Determine if target uses HTTPS
+    const targetUrl = new URL(target);
+    const isHttps = targetUrl.protocol === 'https:';
 
-      const sanitizedHeaders = sanitizeHeaders(req.headers);
+    proxy = createProxyMiddleware({
+      target,
+      changeOrigin: true,
+      agent: isHttps ? getHttpsAgent() : getHttpAgent(),
+      proxyTimeout: 30000,
+      timeout: 30000,
+      pathRewrite: {
+        [`^${api.prefix}`]: ''
+      },
+      onProxyReq: (proxyReq, req) => {
+        logger.debug(`Proxying to ${target}${req.path}`);
 
-      for (const [key, value] of Object.entries(sanitizedHeaders)) {
-        if (key !== 'host') {
-          proxyReq.setHeader(key, value);
+        const sanitizedHeaders = sanitizeHeaders(req.headers);
+        for (const [key, value] of Object.entries(sanitizedHeaders)) {
+          if (key !== 'host') {
+            proxyReq.setHeader(key, value);
+          }
+        }
+
+        if (req.user) {
+          proxyReq.setHeader('X-User-Id', req.user.id);
+          proxyReq.setHeader('X-User-Role', req.user.role || 'unknown');
+        }
+
+        proxyReq.setHeader('X-Forwarded-For', req.ip);
+        proxyReq.setHeader('X-Gateway-Request-Id', req.id || `req-${Date.now()}`);
+        proxyReq.setHeader('X-Proxy-By', 'apix-gateway');
+      },
+      onProxyRes: (proxyRes, req, res) => {
+        delete proxyRes.headers['www-authenticate'];
+        const proxyLatency = proxyRes.headers['x-response-time'];
+        if (proxyLatency) {
+          res.set('X-Upstream-Latency', proxyLatency);
+        }
+
+        // Buffer body for Load Balancer soft-failure checks
+        const lb = req._pluginOptions?.['load-balancer'];
+        if (lb?.enabled && lb.trustedSuccessPatterns?.enabled) {
+          let body = Buffer.from([]);
+          proxyRes.on('data', (chunk) => {
+            if (body.length < 16384) {
+              body = Buffer.concat([body, chunk]);
+            }
+          });
+          proxyRes.on('end', () => {
+            if (req._onResponse) {
+              const success = res.statusCode < 400;
+              const latency = Date.now() - (req._startTime || Date.now());
+              const geo = req.headers['cf-ipcountry'] || req.headers['x-geo-country'] || 'unknown';
+              req._onResponse(success, latency, req.path, geo, body.toString());
+            }
+          });
+        }
+      },
+      onError: (err, req, res) => {
+        logger.error('Proxy error', { error: err.message, code: err.code, target });
+        if (!res.headersSent) {
+          res.status(502).json({
+            error: 'Bad gateway',
+            message: 'Upstream service unavailable',
+            code: err.code
+          });
         }
       }
+    });
 
-      if (req.user) {
-        proxyReq.setHeader('X-User-Id', req.user.id);
-        proxyReq.setHeader('X-User-Role', req.user.role || 'unknown');
-      }
-
-      proxyReq.setHeader('X-Forwarded-For', req.ip);
-      proxyReq.setHeader('X-Gateway-Request-Id', req.id || `req-${Date.now()}`);
-      // Indicate this is a proxied request
-      proxyReq.setHeader('X-Proxy-By', 'apix-gateway');
-    },
-    onProxyRes: (proxyRes, req, res) => {
-      delete proxyRes.headers['www-authenticate'];
-      // Add response timing header
-      const proxyLatency = proxyRes.headers['x-response-time'];
-      if (proxyLatency) {
-        res.set('X-Upstream-Latency', proxyLatency);
-      }
-
-      // Buffer body for Load Balancer soft-failure checks (Ben's suggestion #12)
-      const lb = req._pluginOptions?.['load-balancer'];
-      if (lb?.enabled && lb.trustedSuccessPatterns?.enabled) {
-        let body = Buffer.from([]);
-        proxyRes.on('data', (chunk) => {
-          // Limit buffering to first 16KB for performance
-          if (body.length < 16384) {
-            body = Buffer.concat([body, chunk]);
-          }
-        });
-        proxyRes.on('end', () => {
-          // Pass captured body to load balancer release if it hasn't been called yet
-          if (req._onResponse) {
-            const success = res.statusCode < 400;
-            const latency = Date.now() - (req._startTime || Date.now());
-            const geo = req.headers['cf-ipcountry'] || req.headers['x-geo-country'] || 'unknown';
-            req._onResponse(success, latency, req.path, geo, body.toString());
-          }
-        });
-      }
-    },
-    onError: (err, req, res) => {
-      logger.error('Proxy error', { error: err.message, code: err.code, target: api.target });
-      res.status(502).json({
-        error: 'Bad gateway',
-        message: 'Upstream service unavailable',
-        code: err.code
-      });
+    proxyCache.set(cacheKey, proxy);
+    
+    // Periodic cleanup of very large caches
+    if (proxyCache.size > 1000) {
+      const firstKey = proxyCache.keys().next().value;
+      proxyCache.delete(firstKey);
     }
-  });
+  }
 
   proxy(req, res, next);
 });
