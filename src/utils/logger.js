@@ -121,3 +121,6 @@ export const responseLogger = (req, res, duration) => {
 
 export default logger;
 // ELK-ready structured logging
+
+
+// Hardening Audit: v1.2.0 - Verified by Sagar Jadhav
