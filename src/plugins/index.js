@@ -205,3 +205,4 @@ class PluginManager {
 // Singleton instance
 export const pluginManager = new PluginManager();
 export default pluginManager;
+// Plugin lifecycle manager
