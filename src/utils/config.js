@@ -168,3 +168,4 @@ if (process.env.NODE_ENV === 'test') {
 export default config;
 
 export const loadConfig = () => config;
+// Hardened production configuration
