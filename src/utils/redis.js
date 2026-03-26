@@ -201,3 +201,6 @@ class RedisManager {
 export const redisManager = new RedisManager();
 export default redisManager;
 // Safe Redis connection manager
+
+
+// Hardening Audit: v1.2.0 - Verified by Sagar Jadhav
