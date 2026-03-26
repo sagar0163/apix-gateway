@@ -200,3 +200,4 @@ class RedisManager {
 // Singleton instance
 export const redisManager = new RedisManager();
 export default redisManager;
+// Safe Redis connection manager
