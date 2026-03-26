@@ -56,7 +56,10 @@ app.use(express.urlencoded({
 app.use(sanitization);
 
 // Global rate limiter (before plugins for DoS protection)
-app.use(rateLimiter.middleware);
+// Skip rate limiting for health checks to prevent false alarms
+app.use(rateLimiter.create({
+  skip: (req) => req.path === '/health' || req.path === '/health/detailed'
+}));
 
 // Prometheus metrics
 app.use(prometheusMetrics({ prefix: 'apix' }));
