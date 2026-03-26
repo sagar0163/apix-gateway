@@ -1,4 +1,4 @@
-// Circuit Breaker Plugin - Thread-Safe Implementation with Mutex
+// Circuit Breaker Plugin - Hardened Implementation
 import { logger } from '../../utils/logger.js';
 
 const DEFAULT_OPTIONS = {
@@ -14,48 +14,16 @@ const STATE_CLOSED = 'closed';
 const STATE_OPEN = 'open';
 const STATE_HALF_OPEN = 'half-open';
 
-// Thread-safe circuit store with mutex
+// Circuit store for tracking state per service
 class CircuitStore {
   constructor() {
     this.circuits = new Map();
-    this._mutex = new Map(); // Per-service mutex for fine-grained locking
   }
 
-  _getMutex(service) {
-    if (!this._mutex.has(service)) {
-      this._mutex.set(service, { locked: false, queue: [] });
-    }
-    return this._mutex.get(service);
-  }
-
-  // Synchronized access to circuit state
-  _withLock(service, fn) {
-    const mutex = this._getMutex(service);
-    
-    // If not locked, acquire lock immediately
-    if (!mutex.locked) {
-      mutex.locked = true;
-      try {
-        return fn();
-      } finally {
-        this._releaseLock(service);
-      }
-    }
-    
-    // Lock is busy, use atomic check-and-set pattern
-    return fn(); // Fallback: still execute, but race may occur
-  }
-
-  _releaseLock(service) {
-    const mutex = this._mutex.get(service);
-    if (mutex) {
-      mutex.locked = false;
-      // Process any queued operations
-      if (mutex.queue.length > 0) {
-        const next = mutex.queue.shift();
-        next();
-      }
-    }
+  // Logic for state transitions (Node.js is single-threaded for JS execution, so this is atomic)
+  _transition(service, fn) {
+    const circuit = this.getOrCreate(service);
+    return fn(circuit);
   }
 
   getOrCreate(service) {
@@ -73,10 +41,9 @@ class CircuitStore {
     return circuit;
   }
 
-  // Atomic check-and-set for opening circuit (using compare-and-swap pattern)
+  // Atomic check-and-set for opening circuit
   tryOpen(service, threshold) {
-    return this._withLock(service, () => {
-      const circuit = this.getOrCreate(service);
+    return this._transition(service, (circuit) => {
       const now = Date.now();
       
       // Reset window if expired
@@ -85,14 +52,13 @@ class CircuitStore {
         circuit.windowStart = now;
       }
       
-      // Check if already open (another thread beat us)
       if (circuit.state === STATE_OPEN) {
         return false;
       }
       
       circuit.failures++;
       
-      if (circuit.failures >= threshold && circuit.state !== STATE_OPEN) {
+      if (circuit.failures >= threshold) {
         circuit.state = STATE_OPEN;
         circuit.nextAttempt = now + DEFAULT_OPTIONS.timeout;
         logger.error(`Circuit opened for: ${service} (${circuit.failures} failures)`);
@@ -104,8 +70,7 @@ class CircuitStore {
 
   // Atomic success handling
   recordSuccess(service) {
-    return this._withLock(service, () => {
-      const circuit = this.getOrCreate(service);
+    return this._transition(service, (circuit) => {
       const wasHalfOpen = circuit.state === STATE_HALF_OPEN;
       
       circuit.successes++;
@@ -121,7 +86,7 @@ class CircuitStore {
     });
   }
 
-  // Check if circuit allows request (read-heavy, optimized)
+  // Check if circuit allows request (read-deeply optimized)
   canProceed(service) {
     const circuit = this.getOrCreate(service);
     const now = Date.now();
@@ -132,7 +97,7 @@ class CircuitStore {
     
     if (circuit.state === STATE_OPEN) {
       if (now >= circuit.nextAttempt) {
-        // Try to transition to half-open (best effort, no lock for perf)
+        // Transition to half-open
         circuit.state = STATE_HALF_OPEN;
         circuit.successes = 0;
         logger.info(`Circuit half-open for: ${service}`);
@@ -150,16 +115,11 @@ class CircuitStore {
     return { allowed: true, state: STATE_HALF_OPEN };
   }
 
-  // Get circuit state (read-only snapshot)
   getState(service) {
     const circuit = this.circuits.get(service);
-    if (!circuit) {
-      return STATE_CLOSED;
-    }
-    return circuit.state;
+    return circuit ? circuit.state : STATE_CLOSED;
   }
 
-  // Get all circuits (snapshot)
   getCircuits() {
     const result = {};
     for (const [service, state] of this.circuits.entries()) {
@@ -173,7 +133,6 @@ class CircuitStore {
     return result;
   }
 
-  // Manual reset
   reset(service) {
     this.circuits.delete(service);
     logger.info(`Circuit breaker reset for: ${service}`);
@@ -185,50 +144,44 @@ const circuitStore = new CircuitStore();
 
 export default {
   name: 'circuit-breaker',
-  version: '1.2.0',
-  description: 'Thread-safe circuit breaker with mutex protection',
+  version: '1.2.1',
+  description: 'Fixed and hardened circuit breaker',
   defaultOptions: DEFAULT_OPTIONS,
 
-  // Get circuit state
   getState(service) {
     return circuitStore.getState(service);
   },
 
-  // Get all circuits
   getCircuits() {
     return circuitStore.getCircuits();
   },
 
-  // Manual reset
   reset(service) {
     circuitStore.reset(service);
   },
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['circuit-breaker'] || DEFAULT_OPTIONS;
-    
-    // Use the upstream service from headers or path
     const service = req.headers['x-upstream-service'] || req.path.split('/')[2] || 'default';
     
-    // Check circuit state before processing
+    // Check circuit state
     const check = circuitStore.canProceed(service);
     
     if (!check.allowed) {
       logger.warn(`Circuit open for: ${service}, retry after ${check.retryAfter}s`);
       return res.status(503).json({
         error: 'Service Unavailable',
-        message: `Circuit breaker open for service`,
+        message: 'Circuit breaker open for service',
         service,
         retryAfter: check.retryAfter
       });
     }
 
-    // Wrap response to track failures/successes
+    // Wrap response to track outcomes
     const originalSend = res.send.bind(res);
-    const originalStatusCode = res.statusCode;
     
-    res.send = (body) => {
-      const status = originalStatusCode;
+    res.send = function(body) {
+      const status = res.statusCode || 200;
       const isError = status >= 500;
 
       if (isError) {
