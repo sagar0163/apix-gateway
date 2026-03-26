@@ -11,6 +11,11 @@ const REQUIRED_ENV_VARS = [
 
 // Validate required environment variables
 const validateEnvironment = () => {
+  // Skip validation in test mode
+  if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+    return;
+  }
+
   const missing = [];
   const weak = [];
 

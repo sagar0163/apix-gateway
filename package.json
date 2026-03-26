@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "vitest run",
+    "test": "NODE_ENV=test vitest run",
     "test:watch": "vitest",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix"
