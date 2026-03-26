@@ -36,13 +36,17 @@ export default {
   // Verify signature
   verify(signature, secret, message, algorithm = 'sha256') {
     const expected = this.generate(secret, message, algorithm);
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expected)
-    );
+    const sigBuf = Buffer.from(signature);
+    const expBuf = Buffer.from(expected);
+    
+    if (sigBuf.length !== expBuf.length) {
+      return false;
+    }
+    
+    return crypto.timingSafeEqual(sigBuf, expBuf);
   },
 
-  handler: (req, res, next) => {
+  handler: function(req, res, next) {
     const options = req._pluginOptions?.['hmac-auth'] || DEFAULT_OPTIONS;
     
     const signature = req.headers[options.headerName?.toLowerCase()];
@@ -78,8 +82,9 @@ export default {
     ].join('\n');
 
     try {
+      // Ensure we call verify correctly (using regular function for handler)
       const isValid = this.verify(
-        Buffer.from(signature),
+        signature,
         secret,
         message,
         options.algorithm
