@@ -43,6 +43,7 @@ const createRateLimiter = (options = {}) => {
 
     const key = keyGenerator(req);
     const now = Date.now();
+    req._rateLimitTimestamp = now; // Store for skip logic
     const windowStart = now - windowMs;
 
     try {
@@ -131,7 +132,10 @@ const createRateLimiter = (options = {}) => {
         if (shouldSkip) {
           if (redis && redisClient) {
             const redisKey = `ratelimit:${key}`;
-            await redisClient.zRemRangeByScore(redisKey, 0, windowStart);
+            const timestamp = req._rateLimitTimestamp;
+            if (timestamp) {
+              await redisClient.zRem(redisKey, timestamp.toString());
+            }
           } else {
             const record = memoryStore.get(key);
             if (record) record.count = Math.max(0, record.count - 1);
