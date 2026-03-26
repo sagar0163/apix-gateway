@@ -120,3 +120,4 @@ export const responseLogger = (req, res, duration) => {
 };
 
 export default logger;
+// ELK-ready structured logging
