@@ -25,7 +25,10 @@ const app = express();
 const config = loadConfig();
 
 // Trust proxy for correct IP detection
-app.set('trust proxy', process.env.TRUST_PROXY === 'false' ? false : 1);
+// Only trust the first proxy if explicitly enabled via environment variable
+const trustProxy = process.env.TRUST_PROXY === 'true' ? 1 : 
+                   (process.env.TRUST_PROXY === 'false' ? false : false);
+app.set('trust proxy', trustProxy);
 
 // =======================
 // SECURITY MIDDLEWARE
@@ -35,15 +38,7 @@ app.use(createSecurityMiddleware());
 // Request body parsing with size limits
 app.use(express.json({ 
   limit: process.env.MAX_BODY_SIZE || '1mb',
-  strict: true,
-  verify: (req, res, buf) => {
-    // Verify JSON structure
-    try {
-      JSON.parse(buf.toString());
-    } catch (e) {
-      throw new Error('Invalid JSON');
-    }
-  }
+  strict: true
 }));
 
 app.use(express.urlencoded({ 
