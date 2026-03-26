@@ -21,8 +21,14 @@ export default {
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['jwt-auth'] || DEFAULT_OPTIONS;
     
-    // Check if public path
-    if (options.publicPaths?.some(p => req.path.startsWith(p))) {
+    // Check if public path with proper prefix matching
+    const isPublic = options.publicPaths?.some(p => {
+      if (req.path === p) return true;
+      if (p.endsWith('/')) return req.path.startsWith(p);
+      return req.path.startsWith(p + '/');
+    });
+
+    if (isPublic) {
       return next();
     }
 
@@ -32,7 +38,7 @@ export default {
       if (options.passthrough) {
         return next();
       }
-      logger.warn('No authorization header');
+      logger.warn(`Unauthorized access attempt: No token for ${req.path}`);
       return res.status(401).json({ error: 'Unauthorized', message: 'No token provided' });
     }
 
@@ -40,12 +46,11 @@ export default {
       ? authHeader.slice(options.headerPrefix.length + 1)
       : authHeader;
 
-    // Test bypass
-    if (process.env.NODE_ENV === 'test' && token === 'valid-token') {
+    // Strict test-only bypass
+    if (process.env.NODE_ENV === 'test' && token === 'valid-token' && process.env.ENABLE_TEST_BYPASS === 'true') {
       req.user = { id: 'test-user', role: 'admin' };
       req.authenticated = true;
-      next();
-      return;
+      return next();
     }
 
     try {
