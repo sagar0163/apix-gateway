@@ -38,7 +38,7 @@ export default {
         break;
         
       case 'header':
-        percentage = parseInt(req.headers[options.headerCase()] || '0',Name?.toLower 10);
+        percentage = parseInt(req.headers[options.headerName?.toLower()] || '0', 10);
         break;
         
       case 'ip':

@@ -28,7 +28,7 @@ export default {
     }
   },
 
-  handler: (req, res, next) => {
+  handler(req, res, next) {
     const options = req._pluginOptions?.['request-id'] || DEFAULT_OPTIONS;
     
     // Check for existing ID or generate new

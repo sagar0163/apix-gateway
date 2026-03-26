@@ -19,27 +19,17 @@ class PluginManager {
 
   // Load built-in plugins
   async loadBuiltInPlugins() {
-    const builtInPlugins = [
-      'rate-limiter',
-      'sliding-window-rate-limiter',
-      'jwt-auth',
-      'api-key',
-      'request-transformer',
-      'response-transformer',
-      'ip-whitelist',
-      'cors',
-      'compression',
-      'metrics',
-      'circuit-breaker'
-    ];
+    const builtInDir = path.resolve(__dirname, 'builtins');
+    const files = fs.readdirSync(builtInDir).filter(f => f.endsWith('.js'));
 
-    for (const pluginName of builtInPlugins) {
+    for (const file of files) {
       try {
-        const plugin = await import(`./builtins/${pluginName}.js`);
+        const pluginName = path.basename(file, '.js');
+        const plugin = await import(`./builtins/${file}`);
         this.register(pluginName, plugin.default);
         logger.info(`Loaded built-in plugin: ${pluginName}`);
       } catch (err) {
-        logger.warn(`Failed to load plugin ${pluginName}: ${err.message}`);
+        logger.warn(`Failed to load built-in plugin ${file}: ${err.message}`);
       }
     }
   }
@@ -185,17 +175,11 @@ class PluginManager {
         }
 
         try {
-          const result = await plugin.handler(req, res, () => runPlugin(index + 1));
+          // Set options on request for the plugin to access
+          req._pluginOptions = req._pluginOptions || {};
+          req._pluginOptions[pluginName] = plugin.options;
           
-          // If plugin returns false, stop the chain
-          if (result === false) {
-            return; // Response already sent
-          }
-          
-          // If plugin returns a value, use it as response
-          if (result !== undefined) {
-            return res.json(result);
-          }
+          await plugin.handler(req, res, () => runPlugin(index + 1));
         } catch (err) {
           logger.error(`Plugin ${pluginName} error:`, err);
           
@@ -203,11 +187,13 @@ class PluginManager {
             return plugin.onError(err, req, res, () => runPlugin(index + 1));
           }
           
-          return res.status(500).json({ 
-            error: 'Plugin error', 
-            plugin: pluginName,
-            message: err.message 
-          });
+          if (!res.headersSent) {
+            return res.status(500).json({ 
+              error: 'Plugin error', 
+              plugin: pluginName,
+              message: err.message 
+            });
+          }
         }
       };
 

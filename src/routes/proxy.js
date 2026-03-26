@@ -84,7 +84,7 @@ const sanitizeHeaders = (headers) => {
 const getApiDefinition = (path) => {
   const apis = config.apis || {};
   for (const [prefix, target] of Object.entries(apis)) {
-    if (path.startsWith(`/api${prefix}`)) {
+    if (path.startsWith(prefix)) {
       return { prefix, target };
     }
   }
@@ -99,12 +99,19 @@ router.use('/', async (req, res, next) => {
     return res.status(404).json({ error: 'API not found' });
   }
 
+  // Determine target (Use load balancer selection if present)
+  let target = api.target;
+  if (req._target) {
+    target = req._target;
+    logger.debug(`Using load balancer selected target: ${target}`);
+  }
+
   // Determine if target uses HTTPS
-  const targetUrl = new URL(api.target);
+  const targetUrl = new URL(target);
   const isHttps = targetUrl.protocol === 'https:';
 
   const proxy = createProxyMiddleware({
-    target: api.target,
+    target,
     changeOrigin: true,
     // Use connection pooling
     agent: isHttps ? getHttpsAgent() : getHttpAgent(),
@@ -115,10 +122,10 @@ router.use('/', async (req, res, next) => {
     retry: {
       retries: 3,
       retryDelay: 100,
-      retryOn: [502, 503, 504, 408, ECONNREFUSED]
+      retryOn: [502, 503, 504, 408, 'ECONNREFUSED']
     },
     pathRewrite: {
-      [`^/api${api.prefix}`]: ''
+      [`^${api.prefix}`]: ''
     },
     onProxyReq: (proxyReq, req) => {
       logger.debug(`Proxying to ${api.target}${req.path}`);
@@ -147,6 +154,27 @@ router.use('/', async (req, res, next) => {
       const proxyLatency = proxyRes.headers['x-response-time'];
       if (proxyLatency) {
         res.set('X-Upstream-Latency', proxyLatency);
+      }
+
+      // Buffer body for Load Balancer soft-failure checks (Ben's suggestion #12)
+      const lb = req._pluginOptions?.['load-balancer'];
+      if (lb?.enabled && lb.trustedSuccessPatterns?.enabled) {
+        let body = Buffer.from([]);
+        proxyRes.on('data', (chunk) => {
+          // Limit buffering to first 16KB for performance
+          if (body.length < 16384) {
+            body = Buffer.concat([body, chunk]);
+          }
+        });
+        proxyRes.on('end', () => {
+          // Pass captured body to load balancer release if it hasn't been called yet
+          if (req._onResponse) {
+            const success = res.statusCode < 400;
+            const latency = Date.now() - (req._startTime || Date.now());
+            const geo = req.headers['cf-ipcountry'] || req.headers['x-geo-country'] || 'unknown';
+            req._onResponse(success, latency, req.path, geo, body.toString());
+          }
+        });
       }
     },
     onError: (err, req, res) => {

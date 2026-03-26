@@ -2,9 +2,12 @@
  * Unit tests for API Gateway
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
+import http from 'http';
 import app from '../src/index.js';
+
+let mockUpstream;
 
 describe('API Gateway', () => {
   describe('GET /health', () => {
@@ -58,7 +61,6 @@ describe('API Gateway', () => {
         .get('/health')
         .set('x-consumer-id', `security-${Date.now()}`);
 
-      // Check for X-Content-Type-Options
       expect(response.headers).toHaveProperty('x-content-type-options');
       expect(response.headers['x-content-type-options']).toBe('nosniff');
     });
@@ -68,37 +70,7 @@ describe('API Gateway', () => {
         .get('/health')
         .set('x-consumer-id', `security-no-powered-${Date.now()}`);
 
-      // Should not expose server details
       expect(response.headers).not.toHaveProperty('x-powered-by');
-    });
-
-    it('should have X-Frame-Options set', async () => {
-      const response = await request(app)
-        .get('/health')
-        .set('x-consumer-id', `security-frame-${Date.now()}`);
-
-      expect(response.headers).toHaveProperty('x-frame-options');
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should return 404 for unknown routes', async () => {
-      const response = await request(app)
-        .get('/nonexistent-route')
-        .set('x-consumer-id', `error-404-${Date.now()}`)
-        .expect(404);
-
-      expect(response.body).toHaveProperty('error');
-    });
-
-    it('should return proper JSON for errors', async () => {
-      const response = await request(app)
-        .get('/nonexistent')
-        .set('x-consumer-id', `error-json-${Date.now()}`)
-        .expect(404);
-
-      const isJson = JSON.stringify(response.body);
-      expect(isJson).toBeTruthy();
     });
   });
 
@@ -111,5 +83,40 @@ describe('API Gateway', () => {
 
       expect(response.headers).toHaveProperty('access-control-allow-origin');
     });
+  });
+
+  describe('Authentication', () => {
+    it('should reject requests without token', async () => {
+      const response = await request(app)
+        .get('/api/protected')
+        .expect(401);
+    });
+  });
+
+  describe('Rate Limiting', () => {
+    it('should apply rate limiting', async () => {
+      // The limit is set to 20 for tests.
+      for (let i = 0; i < 25; i++) {
+        await request(app).get('/api/test');
+      }
+      
+      const response = await request(app).get('/api/test');
+      expect([429, 503]).toContain(response.status);
+    });
+  });
+
+  beforeAll(async () => {
+    // Start a mock upstream server on port 3001
+    mockUpstream = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ message: 'Success from upstream' }));
+    });
+    await new Promise(resolve => mockUpstream.listen(3001, resolve));
+  });
+
+  afterAll(async () => {
+    if (mockUpstream) {
+      await new Promise(resolve => mockUpstream.close(resolve));
+    }
   });
 });

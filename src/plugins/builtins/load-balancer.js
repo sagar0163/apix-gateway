@@ -29,6 +29,12 @@ const DEFAULT_OPTIONS = {
   consistentHashing: {
     enabled: true,
     virtualNodes: 150
+  },
+  // NEW: Trusted success patterns (Ben's suggestion #12)
+  // If body contains any of these, treat as failure even if status is 200
+  trustedSuccessPatterns: {
+    enabled: false,
+    patterns: ['captcha', 'access denied', 'blocked']
   }
 };
 
@@ -62,8 +68,8 @@ export default {
   consistentHash(key, targets) {
     if (!targets.length) return null;
     
-    const options = DEFAULT_OPTIONS; // Get from plugin options in real usage
-    const vNodes = 150;
+    const options = this.options || DEFAULT_OPTIONS;
+    const vNodes = options.consistentHashing?.virtualNodes || 150;
     
     // Build hash ring
     const ring = [];
@@ -199,18 +205,29 @@ export default {
         target.lastHealthCheck = Date.now();
         target.healthCheckLatency = latency;
         
-        const isHealthy = res.statusCode < (options.healthCheck.expectedStatus || 500);
+        const isStatusHealthy = res.statusCode < (options.healthCheck.expectedStatus || 500);
+        let isBodyHealthy = true;
         
-        if (isHealthy) {
-          target.healthCheckFailures = 0;
-          // Don't immediately mark healthy - require threshold
-        } else {
-          target.healthCheckFailures++;
-          logger.warn(`Health check failed for ${target.url}: status ${res.statusCode}`);
-        }
-        
-        // SEPARATE: Update infra health based on health check only
-        this.updateTargetHealth(target, options, 'infra');
+        let body = '';
+        res.on('data', (chunk) => body += chunk);
+        res.on('end', () => {
+          if (options.healthCheck.verifyResponse && options.healthCheck.expectedText) {
+            isBodyHealthy = body.includes(options.healthCheck.expectedText);
+          }
+          
+          const isHealthy = isStatusHealthy && isBodyHealthy;
+          
+          if (isHealthy) {
+            target.healthCheckFailures = 0;
+          } else {
+            target.healthCheckFailures++;
+            const reason = !isStatusHealthy ? `status ${res.statusCode}` : `body mismatch`;
+            logger.warn(`Health check failed for ${target.url}: ${reason}`);
+          }
+          
+          // SEPARATE: Update infra health based on health check only
+          this.updateTargetHealth(target, options, 'infra');
+        });
       });
 
       req.on('error', (err) => {
@@ -277,13 +294,33 @@ export default {
 
   // Get next target with cohort awareness
   getTarget(strategy = 'round-robin', clientIp = '', route = '/') {
-    const healthyTargets = this.targets.filter(t => t.healthy);
+    // Filter by global health
+    let filteredTargets = this.targets.filter(t => t.healthy);
     
-    if (healthyTargets.length === 0) {
+    // NEW: Cohort-aware filtering (Ben's suggestion #2)
+    // If a target has a very high error rate for THIS specific route/geo, bypass it
+    // even if it's overall healthy for other cohorts.
+    const cohortThreshold = 0.5; // Bypass if 50% failure for this cohort
+    filteredTargets = filteredTargets.filter(t => {
+      const key = this.getCohortKey(route, '', t.url); // Check route-level first
+      const cohort = this.cohortMetrics.get(key);
+      if (cohort && cohort.requestCount > 5 && cohort.errorRate > cohortThreshold) {
+        return false;
+      }
+      return true;
+    });
+
+    if (filteredTargets.length === 0) {
+      // Fallback to all healthy if cohort filtering removed everything
+      filteredTargets = this.targets.filter(t => t.healthy);
+    }
+
+    if (filteredTargets.length === 0) {
       return null;
     }
 
     let target;
+    const healthyTargets = filteredTargets;
 
     switch (strategy) {
       case 'ip-hash':
@@ -336,17 +373,33 @@ export default {
   },
 
   // Release with separate app-level tracking and cooldown
-  release(target, success, latency = 0, route = '/', geo = 'unknown') {
+  release(target, success, latency = 0, route = '/', geo = 'unknown', body = null) {
     const conns = this.connections.get(target.url) || 1;
     this.connections.set(target.url, Math.max(0, conns - 1));
     
     const now = Date.now();
+    const options = this.options || DEFAULT_OPTIONS;
+    const recoveryThreshold = options.recoveryThreshold || DEFAULT_OPTIONS.recoveryThreshold;
+    const recoveryCooldown = options.recoveryCooldownMs || DEFAULT_OPTIONS.recoveryCooldownMs;
+    let isActuallySuccessful = success;
+
+    // NEW: Trusted success check (Ben's suggestion #12)
+    if (success && body && options.trustedSuccessPatterns?.enabled) {
+      const lowerBody = body.toString().toLowerCase();
+      for (const pattern of options.trustedSuccessPatterns.patterns) {
+        if (lowerBody.includes(pattern.toLowerCase())) {
+          isActuallySuccessful = false;
+          logger.warn(`Soft failure detected (trusted pattern match): ${pattern} on ${target.url}`);
+          break;
+        }
+      }
+    }
 
     // Track cohort-level metrics
-    this.trackCohort(route, geo, target.url, success, latency);
+    this.trackCohort(route, geo, target.url, isActuallySuccessful, latency);
 
     // SEPARATE: Application-level health tracking
-    if (success) {
+    if (isActuallySuccessful) {
       target.requestSuccesses++;
       target.lastSuccessTime = now;
       
@@ -367,8 +420,7 @@ export default {
       
       // Require recovery threshold with cooldown
       const lastFailure = target.lastFailureTime || 0;
-      const recoveryCooldown = DEFAULT_OPTIONS.recoveryCooldownMs;
-      if (target.requestSuccesses >= DEFAULT_OPTIONS.recoveryThreshold && 
+      if (target.requestSuccesses >= recoveryThreshold && 
           (now - lastFailure) >= recoveryCooldown) {
         target.healthy = true;
       }
@@ -447,7 +499,7 @@ export default {
     logger.info('All targets manually reset');
   },
 
-  handler: (req, res, next) => {
+  handler(req, res, next) {
     const options = req._pluginOptions?.['load-balancer'] || DEFAULT_OPTIONS;
     
     if (options.targets.length === 0) {
@@ -455,6 +507,7 @@ export default {
     }
 
     if (this.targets.length === 0) {
+      logger.info(`Initializing load balancer targets for the first time: ${options.targets.join(', ')}`);
       const weights = options.weights || {};
       options.targets.forEach(url => {
         this.addTarget(url, weights[url] || 1);
@@ -477,16 +530,43 @@ export default {
 
     const startTime = Date.now();
     req._target = target.url;
+    req.geo = geo; // Store geo for other plugins/metrics
     
-    // Hook into response with cohort tracking
+    // NEW: Set release callback (Fixes lifecycle bug)
+    req._onResponse = (success, latency, route, geo, body = null) => {
+      this.release(target, success, latency, route, geo, body);
+    };
+
+    // Track if release was called to prevent double-counting
+    let released = false;
+    const callRelease = (success, body = null) => {
+      if (!released) {
+        released = true;
+        const latency = Date.now() - startTime;
+        this.release(target, success, latency, route, geo, body);
+      }
+    };
+    
+    // Fallback: Hook into 'finish' for status-based success (works with streams/proxy)
+    res.on('finish', () => {
+      const success = res.statusCode < 400; // Use < 400 for proxy success
+      callRelease(success);
+    });
+
+    // Strategy 1: Hook into res.send for gateway-generated responses (with body)
     const originalSend = res.send;
     res.send = function(body) {
-      const latency = Date.now() - startTime;
-      const success = res.statusCode < 500;
-      if (req._onResponse) {
-        req._onResponse(success, latency, route, geo);
-      }
+      const success = res.statusCode < 400;
+      callRelease(success, body);
       return originalSend.call(this, body);
+    };
+
+    // Strategy 2: Hook into res.end for streamed/proxied responses (no body easily available here)
+    const originalEnd = res.end;
+    res.end = function(chunk, encoding, callback) {
+      const success = res.statusCode < 400;
+      callRelease(success);
+      return originalEnd.call(this, chunk, encoding, callback);
     };
 
     next();

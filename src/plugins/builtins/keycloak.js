@@ -51,7 +51,7 @@ export default {
     if (!authHeader) {
       return res.status(401).json({
         error: 'Unauthorized',
-        WWW-Authenticate: 'Bearer realm="keycloak"'
+        'WWW-Authenticate': 'Bearer realm="keycloak"'
       });
     }
 

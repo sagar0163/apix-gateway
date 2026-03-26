@@ -73,6 +73,14 @@ export default {
         responseHandled = true;
         req._retryCount++;
         
+        // NEW: Coordinate with load balancer (Ben's suggestion #11)
+        if (options.coordinateWithLoadBalancer && req._onResponse) {
+          const route = req.path;
+          const geo = req.geo || 'unknown';
+          req._onResponse(false, elapsed, route, geo);
+          logger.debug(`Penalized load balancer target ${req._target} due to retry`);
+        }
+
         // Track target for metrics
         if (req._target) {
           req._retryTargets.push(req._target);
@@ -91,6 +99,10 @@ export default {
           res.set('X-Retry-Target', req._target);
         }
         
+        // IMPORTANT: Clear current target so next LB call picks a new one (if LB is active)
+        const oldTarget = req._target;
+        delete req._target; 
+
         responseHandled = false;
         
         // Emit retry event with target info
@@ -98,7 +110,7 @@ export default {
           req.emit('retry', { 
             attempt: req._retryCount, 
             delay,
-            target: req._target,
+            target: oldTarget,
             status
           });
         }, delay);
