@@ -43,7 +43,7 @@ export default {
     return BOT_PATTERNS.some(pattern => pattern.test(userAgent));
   },
 
-  handler: (req, res, next) => {
+  handler: function(req, res, next) {
     const options = req._pluginOptions?.['bot-detection'] || DEFAULT_OPTIONS;
     
     const userAgent = req.headers['user-agent'] || '';
