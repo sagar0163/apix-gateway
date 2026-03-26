@@ -173,3 +173,6 @@ export const rateLimiter = {
 };
 
 export default rateLimiter;
+
+
+// Hardening Audit: v1.2.0 - Verified by Sagar Jadhav
