@@ -540,17 +540,23 @@ export default {
     // Track if release was called to prevent double-counting
     let released = false;
     const callRelease = (success, body = null) => {
-      if (!released) {
-        released = true;
-        const latency = Date.now() - startTime;
-        this.release(target, success, latency, route, geo, body);
-      }
+      // If we already released WITH a body, or we're releasing WITHOUT a body but already did, skip.
+      if (released && (!body || req._hadBody)) return;
+      
+      released = true;
+      if (body) req._hadBody = true;
+      
+      const latency = Date.now() - startTime;
+      this.release(target, success, latency, route, geo, body);
     };
     
     // Fallback: Hook into 'finish' for status-based success (works with streams/proxy)
     res.on('finish', () => {
-      const success = res.statusCode < 400; // Use < 400 for proxy success
-      callRelease(success);
+      // Small delay to allow proxyRes.on('end') in proxy.js to capture body if it exists
+      setTimeout(() => {
+        const success = res.statusCode < 400; 
+        callRelease(success);
+      }, 10);
     });
 
     // Strategy 1: Hook into res.send for gateway-generated responses (with body)
