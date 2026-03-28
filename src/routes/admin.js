@@ -10,9 +10,13 @@ import { prometheusMetrics, getPrometheusMetrics, getMetricsJSON, resetMetrics }
 import { getConnectionStats } from '../middleware/websocket.js';
 import { validate, schemas } from '../middleware/validation.js';
 import { logger } from '../utils/logger.js';
+import openapiRoutes from './openapi.js';
 
 const router = express.Router();
 const config = loadConfig();
+
+// Mount OpenAPI routes (no auth required for docs)
+router.use('/', openapiRoutes);
 
 // Auth middleware
 const authenticate = (req, res, next) => {
@@ -348,6 +352,60 @@ router.post('/cache/clear', authenticate, requireAdmin, (req, res) => {
 
 router.get('/cache/stats', authenticate, (req, res) => {
   res.json(connectionPoolStats());
+});
+
+// =======================
+// Route Plugin Config
+// =======================
+
+// List all route configs
+router.get('/routes', authenticate, (req, res) => {
+  const routeConfigs = pluginManager.getAllRouteConfigs();
+  const apis = config.apis || {};
+
+  const routes = Object.entries(apis).map(([prefix, target]) => ({
+    prefix,
+    target,
+    plugins: routeConfigs[prefix] || {}
+  }));
+
+  res.json({ routes, routeConfigs });
+});
+
+// Get route config for a specific prefix
+router.get('/routes/:prefix', authenticate, (req, res) => {
+  const prefix = '/' + req.params.prefix.replace(/^\//, '');
+  const routeConfig = pluginManager.getRouteConfig(prefix);
+
+  if (!routeConfig) {
+    return res.status(404).json({ error: 'No route config found', prefix });
+  }
+
+  res.json({ prefix, plugins: routeConfig.config });
+});
+
+// Set/update route config
+router.put('/routes/:prefix', authenticate, requireAdmin, (req, res) => {
+  const prefix = '/' + req.params.prefix.replace(/^\//, '');
+  const { plugins } = req.body;
+
+  if (!plugins || typeof plugins !== 'object') {
+    return res.status(400).json({ error: 'plugins object required' });
+  }
+
+  pluginManager.setRouteConfig(prefix, plugins);
+  logger.info(`Route config updated for ${prefix} by ${req.user.id}`, { audit: true, action: 'updateRouteConfig', userId: req.user.id, prefix });
+
+  res.json({ success: true, prefix, plugins });
+});
+
+// Delete route config (revert to global)
+router.delete('/routes/:prefix', authenticate, requireAdmin, (req, res) => {
+  const prefix = '/' + req.params.prefix.replace(/^\//, '');
+  pluginManager.routeConfigs.delete(prefix);
+  logger.info(`Route config deleted for ${prefix} by ${req.user.id}`, { audit: true, action: 'deleteRouteConfig', userId: req.user.id, prefix });
+
+  res.json({ success: true, message: `Route config for ${prefix} removed` });
 });
 
 export default router;
