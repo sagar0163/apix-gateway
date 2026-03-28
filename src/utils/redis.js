@@ -52,10 +52,20 @@ class RedisManager {
         logger.warn('Redis disconnected');
       });
 
-      await this.client.connect();
+      // Add a connection timeout to prevent startup hangs
+      const connectPromise = this.client.connect();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Redis connection timed out')), 2000)
+      );
+
+      await Promise.race([connectPromise, timeoutPromise]);
       return true;
     } catch (err) {
       logger.error('Failed to connect to Redis:', err.message);
+      // Ensure client is cleaned up if connection failed/timed out
+      if (this.client) {
+        this.client.disconnect().catch(() => {});
+      }
       return false;
     }
   }
