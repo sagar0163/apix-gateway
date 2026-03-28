@@ -1,0 +1,97 @@
+# APIX Gateway Configuration
+# Declarative configuration for API Gateway
+
+version: "1.0"
+
+server:
+  port: 3000
+  host: "0.0.0.0"
+  trustProxy: true
+
+cors:
+  origin: "*"
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+  credentials: true
+
+redis:
+  url: "redis://localhost:6379"
+
+upstreams:
+  users:
+    url: "http://localhost:3001"
+    healthCheck:
+      enabled: true
+      path: "/health"
+      interval: 30000
+
+  orders:
+    url: "http://localhost:3002"
+    healthCheck:
+      enabled: true
+      path: "/health"
+      interval: 30000
+
+  products:
+    url: "http://localhost:3003"
+    targets:
+      - "http://localhost:3003"
+      - "http://localhost:3004"
+    strategy: "round-robin"
+
+routes:
+  - path: "/users"
+    upstream: "users"
+    plugins:
+      jwt-auth:
+        enabled: true
+        publicPaths: ["/users/public", "/users/health"]
+      rate-limiter-redis:
+        enabled: true
+        maxRequests: 50
+        algorithm: "sliding"
+
+  - path: "/orders"
+    upstream: "orders"
+    plugins:
+      jwt-auth:
+        enabled: true
+      cache:
+        enabled: true
+        ttl: 30
+      request-log:
+        enabled: true
+
+  - path: "/products"
+    upstream: "products"
+    plugins:
+      cache:
+        enabled: true
+        ttl: 300
+      compression:
+        enabled: true
+      rate-limiter-redis:
+        enabled: true
+        maxRequests: 200
+
+plugins:
+  cors:
+    enabled: true
+    origin: "*"
+
+  metrics:
+    enabled: true
+
+  request-id:
+    enabled: true
+    headerName: "x-request-id"
+
+  rate-limiter-redis:
+    enabled: true
+    windowMs: 60000
+    maxRequests: 100
+    algorithm: "fixed"
+    keyStrategy: "ip"
+
+logging:
+  level: "info"
+  format: "json"
