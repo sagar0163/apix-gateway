@@ -124,6 +124,10 @@ const loadPluginsFromFile = () => {
   return {};
 };
 
+// Load config and separate plugins from routes
+const fileConfig = loadPluginsFromFile();
+const { routes: fileRoutes, ...filePlugins } = fileConfig;
+
 const config = {
   port: parseInt(process.env.PORT || '3000'),
 
@@ -155,7 +159,10 @@ const config = {
   },
 
   // Load plugin config from file or use defaults
-  plugins: { ...DEFAULT_PLUGINS, ...loadPluginsFromFile() }
+  plugins: { ...DEFAULT_PLUGINS, ...filePlugins },
+
+  // Load route-specific plugin configs
+  routes: fileRoutes || {}
 };
 
 // Apply test environment overrides
