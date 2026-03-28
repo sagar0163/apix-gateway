@@ -9,6 +9,7 @@ const DEFAULT_OPTIONS = {
   message: 'Too Many Requests',
   statusCode: 429,
   keyStrategy: 'ip',
+  algorithm: 'fixed', // 'fixed' = INCR+EXPIRE, 'sliding' = sorted sets
   redis: {
     host: 'localhost',
     port: 6379,
@@ -167,25 +168,51 @@ export default {
 
     if (redis) {
       try {
-        // Atomic INCR + EXPIRE via Lua script (no race condition)
-        const luaResult = await redis.eval(RATE_LIMIT_LUA, {
-          keys: [key],
-          arguments: [String(options.windowMs), String(options.maxRequests)]
-        });
+        if (options.algorithm === 'sliding') {
+          // Sliding window using sorted sets (more accurate)
+          const luaResult = await redis.eval(SLIDING_WINDOW_LUA, {
+            keys: [key],
+            arguments: [String(Date.now()), String(options.windowMs), String(options.maxRequests)]
+          });
 
-        const count = luaResult[0];
-        const ttl = luaResult[1];
+          const isLimited = luaResult[0] === 1;
+          const count = luaResult[1];
+          const retryAfter = isLimited ? luaResult[2] : 0;
 
-        result = {
-          count,
-          remaining: Math.max(0, options.maxRequests - count),
-          resetTime: Date.now() + ttl,
-          isLimited: count > options.maxRequests
-        };
+          result = {
+            count,
+            remaining: isLimited ? 0 : luaResult[2],
+            resetTime: isLimited ? Date.now() + (retryAfter * 1000) : Date.now() + options.windowMs,
+            isLimited
+          };
+
+          if (isLimited) {
+            res.set('Retry-After', retryAfter);
+          }
+        } else {
+          // Fixed window with atomic INCR + EXPIRE via Lua script
+          const luaResult = await redis.eval(RATE_LIMIT_LUA, {
+            keys: [key],
+            arguments: [String(options.windowMs), String(options.maxRequests)]
+          });
+
+          const count = luaResult[0];
+          const ttl = luaResult[1];
+
+          result = {
+            count,
+            remaining: Math.max(0, options.maxRequests - count),
+            resetTime: Date.now() + ttl,
+            isLimited: count > options.maxRequests
+          };
+        }
       } catch (err) {
         logger.warn(`Redis error, falling back to memory: ${err.message}`);
         result = checkMemoryLimit(key, options);
       }
+    } else {
+      result = checkMemoryLimit(key, options);
+    }
     } else {
       result = checkMemoryLimit(key, options);
     }
