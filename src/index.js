@@ -103,6 +103,13 @@ app.use((req, res, next) => {
 });
 
 // =======================
+// API DOCS
+// =======================
+app.get('/docs', (req, res) => {
+  res.sendFile(path.join(__dirname, '../ui/docs.html'));
+});
+
+// =======================
 // HEALTH CHECK
 // =======================
 app.get('/health', (req, res) => {
@@ -152,8 +159,18 @@ async function initPlugins() {
       }
     }
   }
+
+  // Load route-specific plugin configs
+  const routes = config.routes || {};
+  for (const [routePrefix, routeConfig] of Object.entries(routes)) {
+    if (routeConfig.plugins) {
+      pluginManager.setRouteConfig(routePrefix, routeConfig.plugins);
+      logger.info(`Route config loaded: ${routePrefix}`);
+    }
+  }
   
   logger.info(`Loaded ${pluginManager.list().length} plugins, ${pluginManager.enabledPlugins.size} enabled`);
+  logger.info(`Route configs: ${Object.keys(pluginManager.getAllRouteConfigs()).length} routes configured`);
 }
 
 // Load plugins before admin routes
@@ -172,12 +189,16 @@ const adminValidate = validate(schemas);
 // =======================
 // PLUGIN MIDDLEWARE
 // =======================
+// Global pre-proxy middleware (cors, rate-limit, etc.)
 app.use(pluginManager.createMiddleware());
 
 // =======================
 // API ROUTES
 // =======================
 app.use('/api', proxyRoutes);
+
+// Global post-proxy middleware (metrics, logging, response transforms)
+app.use(pluginManager.createPostMiddleware());
 
 // 404 handler
 app.use((req, res) => {
@@ -190,6 +211,10 @@ app.use((req, res) => {
 // =======================
 // ERROR HANDLING
 // =======================
+
+// Plugin error middleware (runs onError plugins)
+app.use(pluginManager.createErrorMiddleware());
+
 // JSON parse error
 app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed') {
@@ -305,10 +330,18 @@ const start = () => {
 };
 
 // Check if run directly
-const isMain = import.meta.url === `file://${path.resolve(process.argv[1])}`;
-if (isMain && process.env.NODE_ENV !== 'test') {
-  start();
-}
+const startServer = () => {
+  const isMain = process.argv[1] && (
+    process.argv[1].endsWith('index.js') || 
+    process.argv[1].endsWith('src/index.js')
+  );
+  
+  if (isMain && process.env.NODE_ENV !== 'test') {
+    start();
+  }
+};
+
+startServer();
 
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled rejection at:', promise, 'reason:', reason);
