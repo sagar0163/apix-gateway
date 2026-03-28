@@ -1,0 +1,80 @@
+{
+  "version": "1.0",
+  "server": {
+    "port": 3000,
+    "host": "0.0.0.0"
+  },
+  "plugins": {
+    "cors": {
+      "enabled": true,
+      "origin": "*"
+    },
+    "metrics": {
+      "enabled": true
+    },
+    "request-id": {
+      "enabled": true,
+      "headerName": "x-request-id"
+    },
+    "rate-limiter-redis": {
+      "enabled": true,
+      "windowMs": 60000,
+      "maxRequests": 100,
+      "algorithm": "fixed",
+      "keyStrategy": "ip"
+    }
+  },
+  "routes": [
+    {
+      "path": "/users",
+      "upstream": "users",
+      "plugins": {
+        "jwt-auth": {
+          "enabled": true,
+          "publicPaths": [
+            "/users/public",
+            "/users/health"
+          ]
+        },
+        "rate-limiter-redis": {
+          "enabled": true,
+          "maxRequests": 50,
+          "algorithm": "sliding"
+        }
+      }
+    },
+    {
+      "path": "/orders",
+      "upstream": "orders",
+      "plugins": {
+        "jwt-auth": {
+          "enabled": true
+        },
+        "cache": {
+          "enabled": true,
+          "ttl": 30
+        },
+        "request-log": {
+          "enabled": true
+        }
+      }
+    },
+    {
+      "path": "/products",
+      "upstream": "products",
+      "plugins": {
+        "cache": {
+          "enabled": true,
+          "ttl": 300
+        },
+        "compression": {
+          "enabled": true
+        },
+        "rate-limiter-redis": {
+          "enabled": true,
+          "maxRequests": 200
+        }
+      }
+    }
+  ]
+}
