@@ -1,6 +1,55 @@
+# Dependencies
 node_modules/
+package-lock.json.bak
+
+# Environment
 .env
+.env.local
+.env.*.local
+
+# Logs
 *.log
+logs/
+npm-debug.log*
+
+# OS
 .DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Coverage
 coverage/
+.nyc_output/
+
+# Build
 dist/
+build/
+*.tgz
+
+# Temp files
+tmp/
+*.tmp
+*.bak
+
+# Test artifacts
+test-results/
+playwright-report/
+
+# Docker
+.docker/
+
+# Redis dump
+dump.rdb
+
+# Gateway logs
+logs/*.log
+logs/*.json
+
+# Release notes (auto-generated each release)
+RELEASE-NOTES-*.md
