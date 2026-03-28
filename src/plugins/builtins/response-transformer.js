@@ -14,6 +14,7 @@ export default {
   version: '1.0.0',
   description: 'Transform outgoing responses',
   defaultOptions: DEFAULT_OPTIONS,
+  phase: 'preProxy',
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['response-transformer'] || DEFAULT_OPTIONS;
@@ -58,6 +59,16 @@ export default {
       return originalJson(body);
     };
 
+    next();
+  },
+
+  // Post-proxy hook — runs after proxy response
+  postHandler: (req, res, next) => {
+    // Add timing header after proxy completes
+    if (req._startTime) {
+      const duration = Date.now() - req._startTime;
+      res.set('X-Gateway-Duration', `${duration}ms`);
+    }
     next();
   }
 };
