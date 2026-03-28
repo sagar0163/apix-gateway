@@ -2,6 +2,7 @@ import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { logger } from '../utils/logger.js';
 import config from '../utils/config.js';
+import { pluginManager } from '../plugins/index.js';
 import http from 'http';
 import https from 'https';
 
@@ -103,6 +104,29 @@ router.use('/', async (req, res, next) => {
     return res.status(404).json({ error: 'API not found' });
   }
 
+  // =======================
+  // PRE-PROXY PHASE
+  // Run route-specific pre-proxy plugins (auth, validation, transforms)
+  // =======================
+  try {
+    await pluginManager.runPreProxy(req, res);
+  } catch (err) {
+    logger.error('Pre-proxy plugin error:', err);
+    if (!res.headersSent) {
+      return res.status(err.status || 500).json({
+        error: 'Pre-proxy error',
+        message: err.message
+      });
+    }
+    return;
+  }
+
+  // If response was already sent by a plugin (e.g., rate limiter 429), stop
+  if (res.headersSent) return;
+
+  // =======================
+  // PROXY PHASE
+  // =======================
   // Determine target (Use load balancer selection if present)
   let target = api.target;
   if (req._target) {
@@ -149,11 +173,20 @@ router.use('/', async (req, res, next) => {
         proxyReq.setHeader('X-Proxy-By', 'apix-gateway');
       },
       onProxyRes: (proxyRes, req, res) => {
+        // =======================
+        // POST-PROXY PHASE
+        // Run post-proxy plugins on the response
+        // =======================
         delete proxyRes.headers['www-authenticate'];
         const proxyLatency = proxyRes.headers['x-response-time'];
         if (proxyLatency) {
           res.set('X-Upstream-Latency', proxyLatency);
         }
+
+        // Run post-proxy plugins (non-blocking)
+        pluginManager.runPostProxy(req, res).catch(err => {
+          logger.error('Post-proxy plugin error:', err);
+        });
 
         // Buffer body for Load Balancer soft-failure checks
         const lb = req._pluginOptions?.['load-balancer'];
@@ -175,14 +208,30 @@ router.use('/', async (req, res, next) => {
         }
       },
       onError: (err, req, res) => {
+        // =======================
+        // ON-ERROR PHASE
+        // Run error plugins
+        // =======================
         logger.error('Proxy error', { error: err.message, code: err.code, target });
-        if (!res.headersSent) {
-          res.status(502).json({
-            error: 'Bad gateway',
-            message: 'Upstream service unavailable',
-            code: err.code
-          });
-        }
+
+        pluginManager.runOnError(err, req, res).then(() => {
+          if (!res.headersSent) {
+            res.status(502).json({
+              error: 'Bad gateway',
+              message: 'Upstream service unavailable',
+              code: err.code
+            });
+          }
+        }).catch(handlerErr => {
+          logger.error('Error handler failed:', handlerErr);
+          if (!res.headersSent) {
+            res.status(502).json({
+              error: 'Bad gateway',
+              message: 'Upstream service unavailable',
+              code: err.code
+            });
+          }
+        });
       }
     });
 
