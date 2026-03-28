@@ -1,36 +1,151 @@
 # Changelog
 
-All notable changes to APIX Gateway.
+All notable changes to APIX Gateway will be documented in this file.
+Format based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [1.2.0] - 2026-03-28
-
-### Added
-- **OpenAPI/Swagger Documentation** - Auto-generated OpenAPI 3.0 spec from plugin config
-  - `/admin/openapi.json` — Machine-readable API specification
-  - `/admin/openapi.yaml` — YAML format for tools
-  - `/docs` — Interactive Swagger UI with dark theme
-  - Plugin status badges in the docs UI
-  - Full admin API documentation with request/response schemas
-
-## [1.0.0] - 2026-03-08
-
-### Added
-- Initial release
-- Rate limiting middleware
-- Authentication (JWT, API Key)
-- Response caching
-- Analytics tracking
-- Plugin system
-- Docker support
-- Web UI dashboard
+## [1.3.0] - 2026-03-28
 
 ### Features
-- **Rate Limiting** - Configurable rate limits per endpoint
-- **Authentication** - Multiple auth methods
-- **Caching** - In-memory and Redis support
-- **Analytics** - Request/response logging
-- **Plugins** - Extensible plugin architecture
+
+- add chaos engineering mock services and orchestrator (`6d6b28f`)
+- add postHandler hook to response-transformer plugin (`7a16b68`)
+- add postHandler and onError hooks to request-log plugin (`c1cc418`)
+- add post-proxy and error middleware to app pipeline (`57a3cab`)
+- add per-route plugin config examples to plugins.json (`f137364`)
+- load per-route plugin configs from plugins.json (`6b2ac64`)
+- add admin API for per-route plugin config management (`ed64306`)
+- integrate phase-based plugin execution in proxy route (`a78232e`)
+- add lifecycle hooks (preProxy/postProxy/onError) and per-route plugin config (`25529de`)
+- add OpenAPI 3.0 spec generator and Swagger UI (`9c5f389`)
+- **core**: harden trust proxy and optimize json request handling (`2026c35`)
+- **lb**: implement cohort-aware routing and hardened health monitoring (`ca83a49`)
+- add feature (`c9a9b82`)
+- new enhancement (`e1069b7`)
+- add advanced middleware - Redis cache, GraphQL subscriptions, cluster support, user-based rate limiting (`5bbb44f`)
+- add Prometheus metrics, WebSocket, and batching support (`3baa572`)
+- add admin dashboard UI (`4ac5f60`)
+- add 15+ advanced plugins (`843f992`)
+- add 20+ gateway plugins (`0ad1429`)
+- add powerful plugin system (`b93b3f2`)
+- initial apix-gateway - modern API Gateway (`f2bfa5a`)
+
+### Bug Fixes
+
+- add Redis connection timeout to prevent startup hangs (`79d9467`)
+- use log-line CSS class in chaos log entries (`0033294`)
+- correct CSS/JS asset paths and add API docs link (`f11c64e`)
+- improve dashboard CSS layout and responsiveness (`df9b059`)
+- **resiliency**: circuit breaker status hook and state logic hardening (`ef5d3e0`)
+- **security**: implement headers-sent check and private IP rejection (`fc99daa`)
+- **auth**: safe HMAC signature verification with timingSafeEqual length checks (`ad676c3`)
+- **bot**: correct arrow function context binding in bot detection (`aee2add`)
+- **traffic**: correct redis skip logic for precise rate limiting (`8afddef`)
+- syntax error in sliding-window-rate-limiter plugin (#2) (`8fe7589`)
+- comprehensive test fixes and health endpoint rate limit bypass (#1) (`86d0188`)
+- bug fix (`2c9dbd6`)
+- patch bug (`b18dd2d`)
+- API gateway improvements (`b762d8b`)
+
+### Performance
+
+- **proxy**: implement middleware caching for high-performance routing (`06e2f4f`)
+- improve efficiency (`2e6c213`)
+- optimize speed (`1602a89`)
+- boost performance (`2e30a0a`)
+- add lifecycle management and graceful shutdown (`1f6e037`)
+- add performance & DDoS protection middleware (`87aa418`)
+
+### Documentation
+
+- add detailed roadmap with task IDs and competitive analysis (`08ede9c`)
+- mark OpenAPI/Swagger as completed in roadmap (`d1b8b91`)
+- update changelog for v1.2.0 OpenAPI release (`35844d2`)
+- finalize environment documentation audit (`c29b63b`)
+- finalize plugin engine audit (`422342b`)
+- finalize redis pool audit (`7f54e7b`)
+- finalize telemetry audit (`552cd46`)
+- finalize configuration audit (`2bac77a`)
+- finalize bot detection audit (`14d45ef`)
+- finalize hmac security audit (`873f6b6`)
+- finalize jwt security audit (`58f79ec`)
+- finalize proxy performance audit (`ba8799d`)
+- finalize resiliency audit (`a9e6fbc`)
+- finalize load balancer audit (`e40281a`)
+- finalize rate limiter audit (`74841be`)
+- finalize validation logic audit (`62c7eae`)
+- finalize security middleware audit (`8a82211`)
+- finalize core gateway audit (`dd1d2c2`)
+- **plugins**: add lifecycle management documentation (`b3b806e`)
+- **logger**: add structured logging guidelines (`e1dcc3b`)
+- update readme (`fec81bd`)
+- Add advanced configuration guide (`fc4b6b3`)
+- add CHANGELOG.md for version tracking (`aa21cb6`)
+- add CONTRIBUTING.md with setup guide (`4755047`)
+- update docs (`82f1682`)
+- add docs (`db18a67`)
+- improve README (`e37eb96`)
+- update documentation (`3b198b0`)
+- refresh (`057bdd6`)
+- add comprehensive README (`dd4b1ef`)
+
+### Tests
+
+- add chaos engineering integration tests (`c0811d0`)
+- add circuit breaker failure detection verification suite (`ea64652`)
+- Add API Gateway unit tests (`52b6c78`)
+
+### Other
+
+- **redis**: finalize Redis connection parameters for stability (`2d112cc`)
+- **config**: finalize production hardening parameters (`d7af8c5`)
+- **auth**: harden JWT path prefix matching to prevent route bypass (`ea592ca`)
+- **validate**: block prototype pollution in sanitization engine (`6972ec8`)
+- Harden proxy load balancer based on Ben's suggestions (`2a1d1fb`)
+- Update package-lock.json with dependency versions (`08b8ff0`)
+- Remove deprecated integration.test.cjs file (`8d8cd78`)
+- Enhance load-balancer.js with health tracking and metrics (`52d50eb`)
+- Update index.js with graceful shutdown and server improvements (`1317590`)
+- Update proxy.js with connection pooling support (`7907886`)
+- Enhance sliding-window-rate-limiter.js with Redis backend (`b04a213`)
+- Update plugin index with new plugin registrations (`a7534f1`)
+- Update package.json with new dependencies and scripts (`b74f3a9`)
+- Add integration.test.js for end-to-end testing (`5c1362a`)
+- Add load-balancer.test.js with comprehensive tests (`9f1b52c`)
+- Update gateway.test.js with new test cases (`a3ead6b`)
+- Enhance admin.js with additional admin endpoints (`463072e`)
+- Update websocket.js with connection handling improvements (`d77c287`)
+- Improve metrics.js with additional指标 (`bc8b2cb`)
+- Update header-enrichment.js with custom headers support (`52e4804`)
+- Enhance graphql-protection.js with depth limiting (`bbe6ab6`)
+- Fix basic-auth.js with secure password handling (`606f4a0`)
+- Update redis-cache.js with improved caching logic (`6acbec3`)
+- Enhance performance.js with timing metrics (`b1d31a3`)
+- Add lifecycle.js for request lifecycle hooks (`9b6fd8e`)
+- Improve cluster.js for multi-core utilization (`9018510`)
+- Enhance config.js with validation and defaults (`2812416`)
+- Update .env.example with new configuration options (`ecf7091`)
+- Update README with v1.2.0 features and changelog (`40a3153`)
+- Add distributed tracing plugin with OpenTelemetry-style propagation (`5738c0d`)
+- Add connection pooling for upstream requests (`90d9ed5`)
+- Add graceful shutdown handling with SIGTERM/SIGINT (`596af2b`)
+- Coordinate retry plugin with load balancer (`5460728`)
+- Separate infra-level and app-level health tracking in load balancer (`b1686c8`)
+- Add sliding window rate limiter + complete test suite (`4d3b014`)
+- Security & Performance Fixes (`4d9c60d`)
+- Add BRD and Architecture documentation (`eff8db5`)
+- update4 (`e92c426`)
+- update3 (`05b75eb`)
+- update2 (`3e5cd3a`)
+- update (`922d04b`)
+- add .env.example template to prevent secret exposure (`609420d`)
+- update3 (`4672d70`)
+- update2 (`90af02b`)
+- update (`7c217b4`)
+- more updates (`7f601f2`)
+- additional improvements (`b390013`)
+- add Dockerfile and docker-compose (`d55447d`)
+- harden the gateway with comprehensive security (`1a43011`)
 
 ---
 
-Generated automatically.
+*Auto-generated by APIX Gateway CLI*

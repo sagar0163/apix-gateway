@@ -268,7 +268,7 @@ const start = () => {
     const http2Status = USE_HTTP2 ? 'HTTP/2 Ready (SSL required)' : 'Disabled';
     console.log(chalk.cyan(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   🚀 APIX Gateway  v1.2.0                                    ║
+  ║   🚀 APIX Gateway  v1.3.0                                    ║
   ║   🔒 Security Hardened                                         ║
   ║   📦 Redis Ready (configure to enable)                         ║
   ║   🌐 Server:      http://localhost:${PORT}                         ║
