@@ -25,7 +25,7 @@ Build a production-ready, enterprise-grade API Gateway with modern features, exc
 
 | Feature | Description | Effort | Status |
 |---------|-------------|--------|--------|
-| OpenAPI/Swagger | Auto-generate API docs | Medium | ⏳ Pending |
+| OpenAPI/Swagger | Auto-generate API docs | Medium | ✅ Done (v1.2.0) |
 | Interactive API Explorer | In-browser request testing | Medium | ⏳ Pending |
 | Request/Response Logger | Detailed request viewer | Low | ⏳ Pending |
 | Postman Collection | Export API definitions | Low | ⏳ Pending |
