@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>APIX Gateway - Admin Dashboard</title>
-  <link rel="stylesheet" href="/ui/css/styles.css">
+  <link rel="stylesheet" href="/css/styles.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
 </head>
 <body>
@@ -73,7 +73,19 @@
             Logs
           </a>
         </li>
-        <li class="nav-item" style="margin-top: auto;">
+        <li class="nav-item">
+          <a href="#" class="nav-link" data-page="chaos">
+            <span class="nav-icon">🌪️</span>
+            Chaos Pulse
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="/docs" class="nav-link" target="_blank">
+            <span class="nav-icon">📖</span>
+            API Docs
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="#" class="nav-link" onclick="logout();return false;">
             <span class="nav-icon">🚪</span>
             Logout
@@ -87,8 +99,13 @@
       <!-- Dashboard Page -->
       <div id="dashboard" class="page">
         <div class="page-header">
-          <h1 class="page-title">Dashboard</h1>
-          <span style="color: var(--text-muted)">Real-time statistics</span>
+          <div>
+            <h1 class="page-title">Dashboard</h1>
+            <p class="page-subtitle">Real-time gateway statistics</p>
+          </div>
+          <a href="/docs" target="_blank" class="btn btn-primary" style="width:auto;">
+            📖 API Docs
+          </a>
         </div>
 
         <div class="stats-grid">
@@ -135,8 +152,54 @@
           </div>
           <div class="card-body">
             <div class="chart-container">
-              📊 Request chart visualization (connect to metrics plugin)
+              📊 Request chart visualization (Pulse Enabled)
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chaos Page -->
+      <div id="chaos" class="page" style="display: none;">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">🌪️ Chaos Control Center</h1>
+            <p class="page-subtitle">Inject network failures and watch the gateway heal</p>
+          </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card chaos-card" data-port="3010">
+                <h3>Users Service (3010)</h3>
+                <div class="chaos-status" id="status-3010">Healthy</div>
+                <div class="chaos-actions">
+                    <button class="btn btn-danger" onclick="toggleFailure(3010)">Inject Outage</button>
+                    <button class="btn btn-warning" onclick="setDelay(3010, 3000)">Inject 3s Latency</button>
+                </div>
+            </div>
+            
+            <div class="stat-card chaos-card" data-port="3011">
+                <h3>Orders Service (3011)</h3>
+                <div class="chaos-status" id="status-3011">Healthy</div>
+                <div class="chaos-actions">
+                    <button class="btn btn-danger" onclick="toggleFailure(3011)">Inject Outage</button>
+                    <button class="btn btn-warning" onclick="setDelay(3011, 3000)">Inject 3s Latency</button>
+                </div>
+            </div>
+            
+            <div class="stat-card chaos-card" data-port="3012">
+                <h3>Products Service (3012)</h3>
+                <div class="chaos-status" id="status-3012">Healthy</div>
+                <div class="chaos-actions">
+                    <button class="btn btn-danger" onclick="toggleFailure(3012)">Inject Outage</button>
+                    <button class="btn btn-warning" onclick="setDelay(3012, 3000)">Inject 3s Latency</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header"><h3 class="card-title">Chaos Log</h3></div>
+          <div class="card-body log-container" id="chaosLogs">
+            <div class="log-line"><span class="log-time">[Ready]</span> Chaos Pulse demonstration ready...</div>
           </div>
         </div>
       </div>
@@ -248,12 +311,12 @@
         </div>
         <div class="card">
           <div class="card-body">
-            <div style="font-family: monospace; font-size: 0.875rem; color: var(--text-muted);">
-              <p>[2024-01-15T10:30:00Z] INFO Gateway started on port 3000</p>
-              <p>[2024-01-15T10:30:01Z] INFO Loaded 20 plugins</p>
-              <p>[2024-01-15T10:30:05Z] INFO Request: GET /health - 200</p>
-              <p>[2024-01-15T10:31:00Z] WARN Rate limit exceeded for 192.168.1.1</p>
-              <p>[2024-01-15T10:32:00Z] ERROR Upstream timeout /api/users</p>
+            <div class="log-container" id="logsContainer">
+              <div class="log-line"><span class="log-time">[2026-03-28T10:30:00Z]</span> <span class="log-info">INFO</span> Gateway started on port 3000</div>
+              <div class="log-line"><span class="log-time">[2026-03-28T10:30:01Z]</span> <span class="log-info">INFO</span> Loaded 40 plugins, 4 enabled</div>
+              <div class="log-line"><span class="log-time">[2026-03-28T10:30:05Z]</span> <span class="log-info">INFO</span> Request: GET /health - 200 (1ms)</div>
+              <div class="log-line"><span class="log-time">[2026-03-28T10:31:00Z]</span> <span class="log-warn">WARN</span> Rate limit exceeded for 192.168.1.1</div>
+              <div class="log-line"><span class="log-time">[2026-03-28T10:32:00Z]</span> <span class="log-error">ERROR</span> Upstream timeout /api/users</div>
             </div>
           </div>
         </div>
@@ -261,6 +324,6 @@
     </main>
   </div>
 
-  <script src="/ui/js/app.js"></script>
+  <script src="/js/app.js"></script>
 </body>
 </html>
