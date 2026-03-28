@@ -2,6 +2,16 @@
 
 All notable changes to APIX Gateway.
 
+## [1.2.0] - 2026-03-28
+
+### Added
+- **OpenAPI/Swagger Documentation** - Auto-generated OpenAPI 3.0 spec from plugin config
+  - `/admin/openapi.json` — Machine-readable API specification
+  - `/admin/openapi.yaml` — YAML format for tools
+  - `/docs` — Interactive Swagger UI with dark theme
+  - Plugin status badges in the docs UI
+  - Full admin API documentation with request/response schemas
+
 ## [1.0.0] - 2026-03-08
 
 ### Added
