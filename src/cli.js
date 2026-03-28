@@ -21,6 +21,7 @@ import { execSync } from 'child_process';
 import { bumpVersion, getCurrentVersion, detectBumpType } from './version/manager.js';
 import { generateChangelog } from './version/changelog.js';
 import { generateReleaseNotes } from './version/release.js';
+import { loadDeclarativeConfig, validateConfig, configToInternal, exportConfig } from './utils/declarative.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -181,6 +182,118 @@ function cmdStatus() {
     const count = run(`git rev-list ${commitsSince}..HEAD --count`);
     log(`  Unreleased: ${count} commits`);
   }
+
+  // Check for config files
+  const yamlExists = fs.existsSync(path.join(ROOT, 'apix.yaml'));
+  const jsonExists = fs.existsSync(path.join(ROOT, 'apix.json'));
+  log(`  Config:    ${yamlExists ? 'apix.yaml' : jsonExists ? 'apix.json' : 'none found'}`);
+}
+
+function cmdValidate(configPath) {
+  const filePath = configPath || './apix.yaml';
+  info(`Validating ${filePath}...`);
+
+  const config = loadDeclarativeConfig(path.resolve(ROOT, filePath));
+  if (!config) {
+    error(`Config file not found: ${filePath}`);
+  }
+
+  const result = validateConfig(config);
+
+  if (result.valid) {
+    success('Config is valid');
+
+    // Show summary
+    const internal = configToInternal(config);
+    log('');
+    log(`  Routes:    ${Object.keys(internal.apis).length}`);
+    log(`  Plugins:   ${Object.keys(internal.plugins).length}`);
+    log(`  Route configs: ${Object.keys(internal.routes).length}`);
+  } else {
+    error(`Config validation failed:\n${result.errors.map(e => `  - ${e}`).join('\n')}`);
+  }
+}
+
+function cmdSync(configPath) {
+  const filePath = configPath || './apix.yaml';
+  info(`Loading config from ${filePath}...`);
+
+  const config = loadDeclarativeConfig(path.resolve(ROOT, filePath));
+  if (!config) {
+    error(`Config file not found: ${filePath}`);
+  }
+
+  // Validate first
+  const result = validateConfig(config);
+  if (!result.valid) {
+    error(`Config validation failed:\n${result.errors.map(e => `  - ${e}`).join('\n')}`);
+  }
+
+  const internal = configToInternal(config);
+
+  // Export as plugins.json
+  const pluginsPath = path.join(ROOT, 'plugins.json');
+  const pluginsData = { ...internal.plugins };
+
+  // Add routes
+  if (Object.keys(internal.routes).length > 0) {
+    pluginsData.routes = {};
+    for (const [prefix, config] of Object.entries(internal.routes)) {
+      pluginsData.routes[prefix] = config;
+    }
+  }
+
+  fs.writeFileSync(pluginsPath, JSON.stringify(pluginsData, null, 2) + '\n');
+  success(`Updated plugins.json with ${Object.keys(internal.plugins).length} plugins`);
+
+  // Show summary
+  log('');
+  log(`  Upstreams: ${Object.keys(internal.apis).length}`);
+  log(`  Routes:    ${Object.keys(internal.routes).length}`);
+  log(`  Plugins:   ${Object.keys(internal.plugins).length}`);
+}
+
+async function cmdDump() {
+  info('Dumping current config...');
+
+  // Write a dump config from plugins.json
+  const pluginsPath = path.join(ROOT, 'plugins.json');
+  if (!fs.existsSync(pluginsPath)) {
+    error('plugins.json not found');
+  }
+
+  const plugins = JSON.parse(fs.readFileSync(pluginsPath, 'utf8'));
+  const { routes, ...pluginConfig } = plugins;
+
+  const dump = {
+    version: '1.0',
+    server: { port: 3000, host: '0.0.0.0' },
+    plugins: {},
+    routes: []
+  };
+
+  // Convert plugins
+  for (const [name, config] of Object.entries(pluginConfig)) {
+    if (typeof config === 'object') {
+      dump.plugins[name] = config;
+    }
+  }
+
+  // Convert routes
+  if (routes) {
+    for (const [prefix, config] of Object.entries(routes)) {
+      dump.routes.push({
+        path: prefix,
+        upstream: prefix.replace(/^\//, ''),
+        plugins: config.plugins || {}
+      });
+    }
+  }
+
+  // Write as JSON (yaml import is async, use JSON for simplicity)
+  const outputPath = path.join(ROOT, 'apix-dump.json');
+  fs.writeFileSync(outputPath, JSON.stringify(dump, null, 2) + '\n');
+  success(`Config dumped to ${outputPath}`);
 }
 
 function cmdHelp() {
@@ -196,6 +309,9 @@ ${c.yellow}Commands:${c.reset}
                         Types: patch, minor, major, auto (default: auto)
   ${c.green}changelog${c.reset}            Generate CHANGELOG.md from git commits
   ${c.green}notes${c.reset}                Generate release notes for current version
+  ${c.green}validate${c.reset} [file]      Validate apix.yaml config file
+  ${c.green}sync${c.reset} [file]          Apply declarative config (generates plugins.json)
+  ${c.green}dump${c.reset}                 Export current config as apix-dump.yaml
   ${c.green}status${c.reset}               Show project status summary
   ${c.green}help${c.reset}                 Show this help message
 
@@ -244,6 +360,16 @@ switch (command) {
   case 'status':
   case 's':
     cmdStatus();
+    break;
+  case 'validate':
+  case 'val':
+    cmdValidate(args[0]);
+    break;
+  case 'sync':
+    cmdSync(args[0]);
+    break;
+  case 'dump':
+    await cmdDump();
     break;
   case 'help':
   case 'h':
