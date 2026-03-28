@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>APIX Gateway - API Documentation</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html {
+      background: #0d1117;
+      color: #c9d1d9;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: #0d1117;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+      border-bottom: 1px solid #30363d;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #e6edf3;
+    }
+
+    .header h1 span {
+      color: #a371f7;
+    }
+
+    .header .version {
+      background: rgba(163, 113, 247, 0.15);
+      color: #a371f7;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-right a {
+      color: #8b949e;
+      text-decoration: none;
+      font-size: 13px;
+      transition: color 0.2s;
+    }
+
+    .header-right a:hover {
+      color: #a371f7;
+    }
+
+    .plugin-bar {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      overflow-x: auto;
+    }
+
+    .plugin-bar .label {
+      font-size: 12px;
+      color: #8b949e;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+
+    .plugin-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .plugin-badge.enabled {
+      background: rgba(63, 185, 80, 0.15);
+      color: #3fb950;
+      border: 1px solid rgba(63, 185, 80, 0.3);
+    }
+
+    .plugin-badge.disabled {
+      background: rgba(48, 54, 61, 0.5);
+      color: #484f58;
+      border: 1px solid #30363d;
+    }
+
+    .plugin-badge .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .plugin-badge.enabled .dot {
+      background: #3fb950;
+    }
+
+    .plugin-badge.disabled .dot {
+      background: #484f58;
+    }
+
+    #swagger-ui {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* Override Swagger UI dark theme */
+    .swagger-ui .topbar { display: none; }
+    .swagger-ui { background: transparent; color: #c9d1d9; }
+    .swagger-ui .info .title { color: #e6edf3; }
+    .swagger-ui .info .description { color: #8b949e; }
+    .swagger-ui .opblock-tag { color: #e6edf3; border-color: #30363d; }
+    .swagger-ui .opblock-tag:hover { background: rgba(163, 113, 247, 0.05); }
+    .swagger-ui .opblock { border-color: #30363d; background: #161b22; }
+    .swagger-ui .opblock .opblock-summary-path { color: #c9d1d9; }
+    .swagger-ui .opblock .opblock-summary-description { color: #8b949e; }
+    .swagger-ui .opblock.opblock-get { background: rgba(56, 132, 244, 0.1); border-color: rgba(56, 132, 244, 0.3); }
+    .swagger-ui .opblock.opblock-post { background: rgba(63, 185, 80, 0.1); border-color: rgba(63, 185, 80, 0.3); }
+    .swagger-ui .opblock.opblock-put { background: rgba(210, 153, 34, 0.1); border-color: rgba(210, 153, 34, 0.3); }
+    .swagger-ui .opblock.opblock-delete { background: rgba(248, 81, 73, 0.1); border-color: rgba(248, 81, 73, 0.3); }
+    .swagger-ui .opblock.opblock-patch { background: rgba(136, 87, 229, 0.1); border-color: rgba(136, 87, 229, 0.3); }
+    .swagger-ui section.models { border-color: #30363d; background: #161b22; }
+    .swagger-ui section.models .model-container { background: #0d1117; }
+    .swagger-ui .model { color: #c9d1d9; }
+    .swagger-ui .model-title { color: #e6edf3; }
+    .swagger-ui .prop .property-name { color: #a371f7; }
+    .swagger-ui table thead tr td,
+    .swagger-ui table thead tr th { color: #8b949e; border-color: #30363d; }
+    .swagger-ui .parameter__name { color: #e6edf3; }
+    .swagger-ui .parameter__type { color: #8b949e; }
+    .swagger-ui .response-col_status { color: #c9d1d9; }
+    .swagger-ui .response-col_description { color: #8b949e; }
+    .swagger-ui .highlight-code { background: #161b22; }
+    .swagger-ui .copy-to-clipboard { background: #30363d; }
+    .swagger-ui .btn { background: #21262d; border-color: #30363d; color: #c9d1d9; }
+    .swagger-ui .btn:hover { background: #30363d; }
+    .swagger-ui .btn.authorize { background: rgba(163, 113, 247, 0.15); border-color: #a371f7; color: #a371f7; }
+    .swagger-ui .btn.cancel { background: rgba(248, 81, 73, 0.15); border-color: #f85149; color: #f85149; }
+
+    .loading {
+      text-align: center;
+      padding: 60px 24px;
+      color: #8b949e;
+    }
+
+    .loading .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #30363d;
+      border-top-color: #a371f7;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h1><span>APIX</span> Gateway</h1>
+      <span class="version" id="version">v1.2.0</span>
+    </div>
+    <div class="header-right">
+      <a href="/">Dashboard</a>
+      <a href="/admin/openapi.json" target="_blank">OpenAPI JSON</a>
+      <a href="https://github.com/sagar0163/apix-gateway" target="_blank">GitHub</a>
+    </div>
+  </div>
+
+  <div class="plugin-bar" id="plugin-bar">
+    <span class="label">Plugins:</span>
+  </div>
+
+  <div id="swagger-ui">
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Loading API documentation...</p>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    const ui = SwaggerUIBundle({
+      url: '/admin/openapi.json',
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      presets: [
+        SwaggerUIBundle.presets.apis,
+        SwaggerUIBundle.SwaggerUIStandalonePreset
+      ],
+      layout: 'BaseLayout',
+      docExpansion: 'list',
+      defaultModelsExpandDepth: 1,
+      defaultModelExpandDepth: 1,
+      filter: true,
+      syntaxHighlight: {
+        activated: true,
+        theme: 'monokai'
+      },
+      requestInterceptor: (req) => {
+        return req;
+      }
+    });
+
+    window.ui = ui;
+
+    // Load plugin badges
+    fetch('/admin/openapi.json')
+      .then(r => r.json())
+      .then(spec => {
+        const bar = document.getElementById('plugin-bar');
+        if (spec['x-plugin-categories']) {
+          for (const [category, plugins] of Object.entries(spec['x-plugin-categories'])) {
+            for (const plugin of plugins) {
+              const badge = document.createElement('span');
+              badge.className = `plugin-badge ${plugin.enabled ? 'enabled' : 'disabled'}`;
+              badge.innerHTML = `<span class="dot"></span>${plugin.name}`;
+              badge.title = `${category}: ${plugin.enabled ? 'Enabled' : 'Disabled'}`;
+              bar.appendChild(badge);
+            }
+          }
+        }
+        if (spec.info?.version) {
+          document.getElementById('version').textContent = `v${spec.info.version}`;
+        }
+      })
+      .catch(() => {});
+  </script>
+</body>
+</html>
