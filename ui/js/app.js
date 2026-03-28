@@ -95,6 +95,63 @@ function navigateTo(page) {
   if (page === 'plugins') loadPlugins();
   if (page === 'keys') loadApiKeys();
   if (page === 'circuits') loadCircuits();
+  if (page === 'chaos') loadChaosStatus();
+}
+
+async function loadChaosStatus() {
+  try {
+    const res = await fetch('http://localhost:3099/status');
+    const data = await res.json();
+    
+    [3010, 3011, 3012].forEach(port => {
+      const statusEl = document.getElementById(`status-${port}`);
+      if (data.failures.includes(port)) {
+        statusEl.textContent = '❌ OFFline';
+        statusEl.style.color = 'var(--danger)';
+      } else if (data.delays[port] > 0) {
+        statusEl.textContent = `⏳ Slow (${data.delays[port]}ms)`;
+        statusEl.style.color = 'var(--warning)';
+      } else {
+        statusEl.textContent = '✅ Healthy';
+        statusEl.style.color = 'var(--active)';
+      }
+    });
+  } catch (err) {
+    console.warn('Chaos orchestrator not reachable');
+  }
+}
+
+async function toggleFailure(port) {
+  try {
+    await fetch(`http://localhost:3099/toggle/${port}`, { method: 'POST' });
+    logChaos(`Toggled outage for service on port ${port}`);
+    loadChaosStatus();
+    loadCircuits();
+  } catch (err) {
+    alert('Failed to reach chaos orchestrator');
+  }
+}
+
+async function setDelay(port, ms) {
+  try {
+    await fetch(`http://localhost:3099/delay/${port}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ms: ms === 0 ? 0 : 3000 })
+    });
+    logChaos(`Set latency to ${ms}ms for service on port ${port}`);
+    loadChaosStatus();
+  } catch (err) {
+    alert('Failed to reach chaos orchestrator');
+  }
+}
+
+function logChaos(msg) {
+  const logs = document.getElementById('chaosLogs');
+  const div = document.createElement('div');
+  div.className = 'log-line';
+  div.innerHTML = `<span class="log-time">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
+  logs.prepend(div);
 }
 
 // Data Loading
@@ -331,5 +388,7 @@ function formatBytes(bytes) {
 setInterval(() => {
   if (document.querySelector('.dashboard.active')) {
     loadStats();
+    if (currentPage === 'chaos') loadChaosStatus();
+    if (currentPage === 'circuits') loadCircuits();
   }
 }, 5000);
