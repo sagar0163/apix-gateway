@@ -125,9 +125,23 @@ function buildKey(req, options) {
       return `${prefix}apikey:${req.headers['x-api-key'] || req.ip}`;
     case 'route':
       return `${prefix}${req.path}:${req.ip}`;
+    case 'route-user':
+      return `${prefix}${req.path}:user:${req.user?.id || req.ip}`;
+    case 'composite':
+      return `${prefix}${req.path}:${req.method}:${req.user?.id || req.ip}`;
     default:
       return `${prefix}${req.ip}`;
   }
+}
+
+// Get effective options for this request (per-route overrides)
+function getEffectiveOptions(req, globalOptions) {
+  // If plugin manager already merged route config, use it
+  if (req._pluginOptions?.['rate-limiter-redis']?._routePrefix) {
+    return req._pluginOptions['rate-limiter-redis'];
+  }
+
+  return globalOptions;
 }
 
 // Fallback to in-memory store
@@ -158,7 +172,8 @@ export default {
   phase: 'preProxy',
 
   handler: async (req, res, next) => {
-    const options = req._pluginOptions?.['rate-limiter-redis'] || DEFAULT_OPTIONS;
+    const globalOptions = req._pluginOptions?.['rate-limiter-redis'] || DEFAULT_OPTIONS;
+    const options = getEffectiveOptions(req, globalOptions);
     const key = buildKey(req, options);
 
     let result;
