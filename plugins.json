@@ -17,14 +17,12 @@
   "request-log": { "enabled": false },
   "circuit-breaker": { "enabled": false, "failureThreshold": 5 },
   "compression": { "enabled": false, "threshold": 1024 },
-  "cache": { 
-    "enabled": false, 
-    "ttl": 60, 
+  "cache": {
+    "enabled": false,
+    "ttl": 60,
     "keyPrefix": "apix:cache:",
     "storage": "redis",
-    "redis": {
-      "ttl": 3600
-    },
+    "redis": { "ttl": 3600 },
     "cacheByStatus": [200, 201, 204, 304],
     "excludePaths": ["/admin/*", "/health"],
     "maxMemoryItems": 1000
@@ -33,22 +31,15 @@
   "request-size": { "enabled": false, "maxBodySize": 1048576 },
   "timeout": { "enabled": false, "upstreamTimeout": 30000 },
   "retry": { "enabled": false, "retries": 3 },
-  "load-balancer": { 
-    "enabled": false, 
-    "targets": [], 
+  "load-balancer": {
+    "enabled": false,
+    "targets": [],
     "strategy": "round-robin",
     "healthCheck": {
-      "enabled": true,
-      "interval": 30000,
-      "timeout": 5000,
-      "unhealthyThreshold": 3,
-      "healthyThreshold": 2,
-      "path": "/health",
-      "useHttps": false
+      "enabled": true, "interval": 30000, "timeout": 5000,
+      "unhealthyThreshold": 3, "healthyThreshold": 2, "path": "/health", "useHttps": false
     },
-    "weights": {},
-    "maxLatency": 10000,
-    "slowStartWeight": 0.25
+    "weights": {}, "maxLatency": 10000, "slowStartWeight": 0.25
   },
   "websocket": { "enabled": false, "path": "/ws", "target": "" },
   "request-validator": { "enabled": false, "schemas": {} },
@@ -63,5 +54,27 @@
   "service-discovery": { "enabled": false, "provider": "static", "services": {} },
   "request-id": { "enabled": true, "headerName": "x-request-id", "generateFn": "uuid" },
   "pagination": { "enabled": false, "defaultLimit": 20, "maxLimit": 100 },
-  "traffic-stats": { "enabled": false, "trackBy": "hour", "retention": 168 }
+  "traffic-stats": { "enabled": false, "trackBy": "hour", "retention": 168 },
+
+  "routes": {
+    "/users": {
+      "plugins": {
+        "jwt-auth": { "enabled": true, "publicPaths": ["/users/public"] },
+        "rate-limiter": { "enabled": true, "maxRequests": 50, "windowMs": 60000 }
+      }
+    },
+    "/orders": {
+      "plugins": {
+        "jwt-auth": { "enabled": true },
+        "cache": { "enabled": true, "ttl": 30 },
+        "request-log": { "enabled": true }
+      }
+    },
+    "/products": {
+      "plugins": {
+        "cache": { "enabled": true, "ttl": 300 },
+        "compression": { "enabled": true }
+      }
+    }
+  }
 }
