@@ -232,10 +232,14 @@ export default {
       result = checkMemoryLimit(key, options);
     }
 
-    // Set rate limit headers
+    // Set rate limit headers (IETF RateLimit Header Fields draft)
     res.set('X-RateLimit-Limit', options.maxRequests);
     res.set('X-RateLimit-Remaining', result.remaining);
     res.set('X-RateLimit-Reset', Math.ceil(result.resetTime / 1000));
+    res.set('RateLimit-Limit', options.maxRequests);
+    res.set('RateLimit-Remaining', result.remaining);
+    res.set('RateLimit-Reset', Math.ceil((result.resetTime - Date.now()) / 1000));
+    res.set('RateLimit-Policy', `${options.maxRequests};w=${Math.ceil(options.windowMs / 1000)}`);
 
     if (result.isLimited) {
       const retryAfter = Math.ceil((result.resetTime - Date.now()) / 1000);
