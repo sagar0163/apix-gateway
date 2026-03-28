@@ -10,6 +10,7 @@ const DEFAULT_OPTIONS = {
   statusCode: 429,
   keyStrategy: 'ip',
   algorithm: 'fixed', // 'fixed' = INCR+EXPIRE, 'sliding' = sorted sets
+  forceMemory: false, // skip Redis, use in-memory only
   redis: {
     host: 'localhost',
     port: 6379,
@@ -18,8 +19,25 @@ const DEFAULT_OPTIONS = {
   }
 };
 
-// In-memory fallback store
+// In-memory fallback store with cleanup
 const memoryStore = new Map();
+const MEMORY_CLEANUP_INTERVAL = 60000; // 1 minute
+let memoryCleanupTimer = null;
+
+function startMemoryCleanup() {
+  if (memoryCleanupTimer) return;
+  memoryCleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [key, record] of memoryStore) {
+      if (now > record.resetTime) {
+        memoryStore.delete(key);
+      }
+    }
+  }, MEMORY_CLEANUP_INTERVAL);
+  memoryCleanupTimer.unref(); // Don't prevent process exit
+}
+
+startMemoryCleanup();
 
 // Redis client (lazy initialized)
 let redisClient = null;
@@ -178,58 +196,59 @@ export default {
 
     let result;
 
-    // Try Redis first with atomic Lua script
-    const redis = await getRedisClient(options);
+    // Use in-memory only if forced or Redis unavailable
+    if (options.forceMemory) {
+      result = checkMemoryLimit(key, options);
+    } else {
+      const redis = await getRedisClient(options);
 
-    if (redis) {
-      try {
-        if (options.algorithm === 'sliding') {
-          // Sliding window using sorted sets (more accurate)
-          const luaResult = await redis.eval(SLIDING_WINDOW_LUA, {
-            keys: [key],
-            arguments: [String(Date.now()), String(options.windowMs), String(options.maxRequests)]
-          });
+      if (redis) {
+        try {
+          if (options.algorithm === 'sliding') {
+            // Sliding window using sorted sets (more accurate)
+            const luaResult = await redis.eval(SLIDING_WINDOW_LUA, {
+              keys: [key],
+              arguments: [String(Date.now()), String(options.windowMs), String(options.maxRequests)]
+            });
 
-          const isLimited = luaResult[0] === 1;
-          const count = luaResult[1];
-          const retryAfter = isLimited ? luaResult[2] : 0;
+            const isLimited = luaResult[0] === 1;
+            const count = luaResult[1];
+            const retryAfter = isLimited ? luaResult[2] : 0;
 
-          result = {
-            count,
-            remaining: isLimited ? 0 : luaResult[2],
-            resetTime: isLimited ? Date.now() + (retryAfter * 1000) : Date.now() + options.windowMs,
-            isLimited
-          };
+            result = {
+              count,
+              remaining: isLimited ? 0 : luaResult[2],
+              resetTime: isLimited ? Date.now() + (retryAfter * 1000) : Date.now() + options.windowMs,
+              isLimited
+            };
 
-          if (isLimited) {
-            res.set('Retry-After', retryAfter);
+            if (isLimited) {
+              res.set('Retry-After', retryAfter);
+            }
+          } else {
+            // Fixed window with atomic INCR + EXPIRE via Lua script
+            const luaResult = await redis.eval(RATE_LIMIT_LUA, {
+              keys: [key],
+              arguments: [String(options.windowMs), String(options.maxRequests)]
+            });
+
+            const count = luaResult[0];
+            const ttl = luaResult[1];
+
+            result = {
+              count,
+              remaining: Math.max(0, options.maxRequests - count),
+              resetTime: Date.now() + ttl,
+              isLimited: count > options.maxRequests
+            };
           }
-        } else {
-          // Fixed window with atomic INCR + EXPIRE via Lua script
-          const luaResult = await redis.eval(RATE_LIMIT_LUA, {
-            keys: [key],
-            arguments: [String(options.windowMs), String(options.maxRequests)]
-          });
-
-          const count = luaResult[0];
-          const ttl = luaResult[1];
-
-          result = {
-            count,
-            remaining: Math.max(0, options.maxRequests - count),
-            resetTime: Date.now() + ttl,
-            isLimited: count > options.maxRequests
-          };
+        } catch (err) {
+          logger.warn(`Redis error, falling back to memory: ${err.message}`);
+          result = checkMemoryLimit(key, options);
         }
-      } catch (err) {
-        logger.warn(`Redis error, falling back to memory: ${err.message}`);
+      } else {
         result = checkMemoryLimit(key, options);
       }
-    } else {
-      result = checkMemoryLimit(key, options);
-    }
-    } else {
-      result = checkMemoryLimit(key, options);
     }
 
     // Set rate limit headers (IETF RateLimit Header Fields draft)
