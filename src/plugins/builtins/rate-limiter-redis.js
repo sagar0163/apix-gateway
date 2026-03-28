@@ -23,6 +23,67 @@ const memoryStore = new Map();
 // Redis client (lazy initialized)
 let redisClient = null;
 
+// Lua script for atomic INCR + EXPIRE
+// Returns [count, ttl_ms] in a single atomic operation
+// This prevents race condition between INCR and EXPIRE
+const RATE_LIMIT_LUA = `
+local key = KEYS[1]
+local window_ms = tonumber(ARGV[1])
+local max_requests = tonumber(ARGV[2])
+
+-- Atomic increment
+local count = redis.call('INCR', key)
+
+-- Set expiry only on first request (count == 1)
+if count == 1 then
+  redis.call('PEXPIRE', key, window_ms)
+end
+
+-- Get remaining TTL
+local ttl = redis.call('PTTL', key)
+if ttl < 0 then
+  ttl = window_ms
+  redis.call('PEXPIRE', key, window_ms)
+end
+
+-- Return count and TTL
+return {count, ttl}
+`;
+
+// Sliding window Lua script using sorted sets
+// More accurate rate limiting that doesn't suffer from boundary issues
+const SLIDING_WINDOW_LUA = `
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window_ms = tonumber(ARGV[2])
+local max_requests = tonumber(ARGV[3])
+local window_start = now - window_ms
+
+-- Remove expired entries
+redis.call('ZREMRANGEBYSCORE', key, '-inf', window_start)
+
+-- Count current window
+local count = redis.call('ZCARD', key)
+
+-- Check if under limit
+if count < max_requests then
+  -- Add current request with unique member (timestamp + random)
+  local member = tostring(now) .. ':' .. math.random(1000000)
+  redis.call('ZADD', key, now, member)
+  redis.call('PEXPIRE', key, window_ms)
+  count = count + 1
+  return {0, count, max_requests - count}
+else
+  -- Get oldest entry to calculate retry-after
+  local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+  local retry_after = 0
+  if #oldest > 0 then
+    retry_after = math.ceil((tonumber(oldest[2]) + window_ms - now) / 1000)
+  end
+  return {1, count, retry_after}
+end
+`;
+
 async function getRedisClient(options) {
   if (redisClient) return redisClient;
 
@@ -101,23 +162,24 @@ export default {
 
     let result;
 
-    // Try Redis first
+    // Try Redis first with atomic Lua script
     const redis = await getRedisClient(options);
 
     if (redis) {
       try {
-        const count = await redis.incr(key);
+        // Atomic INCR + EXPIRE via Lua script (no race condition)
+        const luaResult = await redis.eval(RATE_LIMIT_LUA, {
+          keys: [key],
+          arguments: [String(options.windowMs), String(options.maxRequests)]
+        });
 
-        if (count === 1) {
-          await redis.pExpire(key, options.windowMs);
-        }
-
-        const ttl = await redis.pTTL(key);
+        const count = luaResult[0];
+        const ttl = luaResult[1];
 
         result = {
           count,
           remaining: Math.max(0, options.maxRequests - count),
-          resetTime: Date.now() + (ttl > 0 ? ttl : options.windowMs),
+          resetTime: Date.now() + ttl,
           isLimited: count > options.maxRequests
         };
       } catch (err) {
