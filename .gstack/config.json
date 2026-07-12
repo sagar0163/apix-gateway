@@ -1,0 +1,19 @@
+{
+  "project": "apix-gateway",
+  "repo": "sagar0163/apix-gateway",
+  "branch": "main",
+  "skills": {
+    "review": true,
+    "qa": true,
+    "ship": true,
+    "investigate": true,
+    "plan-eng-review": true,
+    "plan-ceo-review": true,
+    "spec": true,
+    "office-hours": true
+  },
+  "review": {
+    "cross_project_learnings": true,
+    "strict_mode": true
+  }
+}

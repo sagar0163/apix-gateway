@@ -10,56 +10,49 @@
     "enabled": true,
     "headerName": "x-request-id"
   },
-  "rate-limiter-redis": {
+  "rate-limiter": {
     "enabled": true,
     "windowMs": 60000,
     "maxRequests": 100,
     "algorithm": "fixed",
-    "keyStrategy": "ip"
+    "keyStrategy": "ip",
+    "forceMemory": true
+  },
+  "llm-token-counter": {
+    "enabled": true,
+    "encoding": "cl100k_base",
+    "modelEncodings": {
+      "gpt-4o": "o200k_base",
+      "gpt-4o-mini": "o200k_base",
+      "gpt-4": "cl100k_base",
+      "gpt-3.5-turbo": "cl100k_base",
+      "claude-3-5-sonnet": "cl100k_base",
+      "claude-3-opus": "cl100k_base"
+    },
+    "defaultBudget": 8192,
+    "enforceBudget": true,
+    "onBudgetExceeded": "reject"
   },
   "routes": {
     "/users": {
       "plugins": {
-        "jwt-auth": {
-          "enabled": true,
-          "publicPaths": [
-            "/users/public",
-            "/users/health"
-          ]
+        "cors": {
+          "enabled": true
         },
-        "rate-limiter-redis": {
+        "rate-limiter": {
           "enabled": true,
-          "maxRequests": 50,
-          "algorithm": "sliding"
+          "windowMs": 60000,
+          "maxRequests": 50
         }
       }
     },
-    "/orders": {
+    "/admin": {
       "plugins": {
-        "jwt-auth": {
+        "request-id": {
           "enabled": true
         },
-        "cache": {
-          "enabled": true,
-          "ttl": 30
-        },
-        "request-log": {
+        "metrics": {
           "enabled": true
-        }
-      }
-    },
-    "/products": {
-      "plugins": {
-        "cache": {
-          "enabled": true,
-          "ttl": 300
-        },
-        "compression": {
-          "enabled": true
-        },
-        "rate-limiter-redis": {
-          "enabled": true,
-          "maxRequests": 200
         }
       }
     }
