@@ -40,9 +40,9 @@ export default {
           body = options.transformBody(body, req, res);
         } catch (err) {
           logger.error('Response transformation error:', err);
-          return originalJson({ 
-            error: 'Transformation Error', 
-            message: err.message 
+          return originalJson({
+            error: 'Transformation Error',
+            message: err.message
           });
         }
       }

@@ -6,22 +6,22 @@ import crypto from 'crypto';
 const patterns = {
   // Remove null bytes
   nullBytes: /\0/g,
-  
+
   // Remove control characters
   controlChars: /[\x00-\x1F\x7F]/g,
-  
+
   // Remove SQL injection patterns
   sqlInjection: /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|CREATE|TRUNCATE)\b)/gi,
-  
+
   // Remove script tags (XSS)
   scriptTag: /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
-  
+
   // Remove event handlers
   eventHandlers: /\s*on\w+\s*=\s*["'][^"']*["']/gi,
-  
+
   // Remove javascript: URLs
   javascriptUrl: /javascript:/gi,
-  
+
   // Remove data: URLs
   dataUrl: /data:/gi
 };
@@ -29,15 +29,15 @@ const patterns = {
 // Recursive sanitization
 const sanitizeObject = (obj) => {
   if (obj === null || obj === undefined) return obj;
-  
+
   if (typeof obj === 'string') {
     return sanitizeString(obj);
   }
-  
+
   if (Array.isArray(obj)) {
     return obj.map(item => sanitizeObject(item));
   }
-  
+
   if (typeof obj === 'object') {
     const sanitized = {};
     for (const [key, value] of Object.entries(obj)) {
@@ -51,37 +51,37 @@ const sanitizeObject = (obj) => {
     }
     return sanitized;
   }
-  
+
   return obj;
 };
 
 // String sanitization
 const sanitizeString = (str) => {
   if (typeof str !== 'string') return str;
-  
+
   let result = str;
-  
+
   // Remove null bytes
   result = result.replace(patterns.nullBytes, '');
-  
+
   // Remove control characters
   result = result.replace(patterns.controlChars, '');
-  
+
   // Remove SQL injection patterns (optional - can cause false positives)
   if (process.env.BLOCK_SQL_INJECTION === 'true') {
     result = result.replace(patterns.sqlInjection, '****');
   }
-  
+
   // Remove script tags
   result = result.replace(patterns.scriptTag, '');
-  
+
   // Remove event handlers
   result = result.replace(patterns.eventHandlers, '');
-  
+
   // Block dangerous URLs
   result = result.replace(patterns.javascriptUrl, 'blocked:');
   result = result.replace(patterns.dataUrl, 'blocked:');
-  
+
   return result;
 };
 
@@ -96,7 +96,7 @@ const validators = {
     if (!/^[a-zA-Z0-9_-]+$/.test(value)) return 'Username can only contain letters, numbers, - and _';
     return null;
   },
-  
+
   // Email validation
   email: (value) => {
     if (!value) return 'Email is required';
@@ -104,7 +104,7 @@ const validators = {
     if (!emailRegex.test(value)) return 'Invalid email format';
     return null;
   },
-  
+
   // Password validation
   password: (value) => {
     if (!value) return 'Password is required';
@@ -116,7 +116,7 @@ const validators = {
     }
     return null;
   },
-  
+
   // API key validation
   apiKey: (value) => {
     if (!value) return 'API key is required';
@@ -124,14 +124,14 @@ const validators = {
     if (!/^[a-zA-Z0-9_-]+$/.test(value)) return 'Invalid API key characters';
     return null;
   },
-  
+
   // UUID validation
   uuid: (value) => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(value)) return 'Invalid UUID format';
     return null;
   },
-  
+
   // Numeric range
   numberRange: (value, min, max) => {
     const num = Number(value);
@@ -140,7 +140,7 @@ const validators = {
     if (max !== undefined && num > max) return `Must be at most ${max}`;
     return null;
   },
-  
+
   // String length
   stringLength: (value, min, max) => {
     if (typeof value !== 'string') return 'Must be a string';
@@ -148,13 +148,13 @@ const validators = {
     if (max !== undefined && value.length > max) return `Must be at most ${max} characters`;
     return null;
   },
-  
+
   // Enum validation
   enum: (value, allowed) => {
     if (!allowed.includes(value)) return `Must be one of: ${allowed.join(', ')}`;
     return null;
   },
-  
+
   // URL validation
   url: (value) => {
     try {
@@ -173,7 +173,7 @@ const validators = {
 export const validate = (schema) => {
   return (req, res, next) => {
     const errors = [];
-    
+
     // Validate body
     if (schema.body && req.body) {
       for (const [field, rules] of Object.entries(schema.body)) {
@@ -184,7 +184,7 @@ export const validate = (schema) => {
         }
       }
     }
-    
+
     // Validate query
     if (schema.query) {
       for (const [field, rules] of Object.entries(schema.query)) {
@@ -195,7 +195,7 @@ export const validate = (schema) => {
         }
       }
     }
-    
+
     // Validate params
     if (schema.params) {
       for (const [field, rules] of Object.entries(schema.params)) {
@@ -206,7 +206,7 @@ export const validate = (schema) => {
         }
       }
     }
-    
+
     // Validate headers
     if (schema.headers) {
       for (const [field, rules] of Object.entries(schema.headers)) {
@@ -217,7 +217,7 @@ export const validate = (schema) => {
         }
       }
     }
-    
+
     if (errors.length > 0) {
       logger.warn('Validation failed:', errors);
       return res.status(400).json({
@@ -225,7 +225,7 @@ export const validate = (schema) => {
         details: errors
       });
     }
-    
+
     next();
   };
 };
@@ -236,63 +236,63 @@ const validateField = (value, rules) => {
   if (rules.required && (value === undefined || value === null || value === '')) {
     return 'This field is required';
   }
-  
+
   // Skip further validation if not provided and not required
   if (value === undefined || value === null || value === '') {
     return null;
   }
-  
+
   // Type validation
   if (rules.type) {
     switch (rules.type) {
-      case 'string':
-        if (typeof value !== 'string') return 'Must be a string';
-        break;
-      case 'number':
-        if (typeof value !== 'number' || isNaN(value)) return 'Must be a number';
-        break;
-      case 'boolean':
-        if (typeof value !== 'boolean') return 'Must be a boolean';
-        break;
-      case 'array':
-        if (!Array.isArray(value)) return 'Must be an array';
-        break;
-      case 'object':
-        if (typeof value !== 'object' || Array.isArray(value)) return 'Must be an object';
-        break;
+    case 'string':
+      if (typeof value !== 'string') return 'Must be a string';
+      break;
+    case 'number':
+      if (typeof value !== 'number' || isNaN(value)) return 'Must be a number';
+      break;
+    case 'boolean':
+      if (typeof value !== 'boolean') return 'Must be a boolean';
+      break;
+    case 'array':
+      if (!Array.isArray(value)) return 'Must be an array';
+      break;
+    case 'object':
+      if (typeof value !== 'object' || Array.isArray(value)) return 'Must be an object';
+      break;
     }
   }
-  
+
   // Custom validator
   if (rules.validator && typeof rules.validator === 'function') {
     const error = rules.validator(value);
     if (error) return error;
   }
-  
+
   // Built-in validators
   if (rules.type === 'string') {
     if (rules.minLength || rules.maxLength) {
       const error = validators.stringLength(value, rules.minLength, rules.maxLength);
       if (error) return error;
     }
-    
+
     if (rules.pattern) {
       if (!new RegExp(rules.pattern).test(value)) {
         return `Must match pattern: ${rules.pattern}`;
       }
     }
-    
+
     if (rules.enum) {
       const error = validators.enum(value, rules.enum);
       if (error) return error;
     }
   }
-  
+
   if (rules.type === 'number') {
     const error = validators.numberRange(value, rules.min, rules.max);
     if (error) return error;
   }
-  
+
   return null;
 };
 

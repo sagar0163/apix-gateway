@@ -22,7 +22,7 @@ export default {
   getTarget(req, options) {
     const path = req.path;
     const config = options.weights[path] || options.weights['*'];
-    
+
     if (!config || !config.canary) {
       return 'stable';
     }
@@ -30,26 +30,26 @@ export default {
     let percentage = 0;
 
     switch (options.criteria) {
-      case 'cookie':
-        const cookieValue = req.cookies?.[options.cookieName];
-        if (cookieValue) {
-          percentage = parseInt(cookieValue, 10);
-        }
-        break;
-        
-      case 'header':
-        percentage = parseInt(req.headers[options.headerName?.toLower()] || '0', 10);
-        break;
-        
-      case 'ip':
-        const ip = req.ip || req.connection?.remoteAddress || '0';
-        percentage = parseInt(ip.split('.').pop() || '0', 10) % 100;
-        break;
-        
-      case 'random':
-      default:
-        percentage = Math.floor(Math.random() * 100);
-        break;
+    case 'cookie':
+      const cookieValue = req.cookies?.[options.cookieName];
+      if (cookieValue) {
+        percentage = parseInt(cookieValue, 10);
+      }
+      break;
+
+    case 'header':
+      percentage = parseInt(req.headers[options.headerName?.toLower()] || '0', 10);
+      break;
+
+    case 'ip':
+      const ip = req.ip || req.connection?.remoteAddress || '0';
+      percentage = parseInt(ip.split('.').pop() || '0', 10) % 100;
+      break;
+
+    case 'random':
+    default:
+      percentage = Math.floor(Math.random() * 100);
+      break;
     }
 
     // Stickiness (cache result)
@@ -78,16 +78,16 @@ export default {
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['canary-release'] || DEFAULT_OPTIONS;
-    
+
     const path = req.path;
     const config = options.weights[path] || options.weights['*'];
-    
+
     if (!config) {
       return next();
     }
 
     const target = this.getTarget(req, options);
-    
+
     // Set canary cookie
     if (options.sticky) {
       const value = target === 'canary' ? config.canary : (100 - config.canary);

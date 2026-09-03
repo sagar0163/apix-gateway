@@ -40,27 +40,27 @@ export default {
       if (!node) return { valid: true, complexity: 0 };
 
       switch (node.kind) {
-        case 'Field':
-          const baseCost = options.complexityCosts[node.name?.value] || options.defaultCost;
-          complexity += baseCost;
+      case 'Field':
+        const baseCost = options.complexityCosts[node.name?.value] || options.defaultCost;
+        complexity += baseCost;
 
-          if (node.arguments?.length > options.maxAliases) {
-            return { valid: false, reason: 'too many arguments' };
+        if (node.arguments?.length > options.maxAliases) {
+          return { valid: false, reason: 'too many arguments' };
+        }
+
+        if (node.selectionSet) {
+          for (const sel of node.selectionSet.selections) {
+            const result = traverse(sel, depth + 1);
+            if (!result.valid) return result;
+            complexity += result.complexity;
           }
+        }
+        break;
 
-          if (node.selectionSet) {
-            for (const sel of node.selectionSet.selections) {
-              const result = traverse(sel, depth + 1);
-              if (!result.valid) return result;
-              complexity += result.complexity;
-            }
-          }
-          break;
-
-        case 'FragmentSpread':
-        case 'InlineFragment':
-          // Handle fragments
-          break;
+      case 'FragmentSpread':
+      case 'InlineFragment':
+        // Handle fragments
+        break;
       }
 
       return { valid: true, complexity };

@@ -34,18 +34,18 @@ export default {
   // Check if user agent is a bot
   isBot(userAgent) {
     if (!userAgent) return false;
-    
+
     // Check verified bots first
     if (VERIFIED_BOTS.some(pattern => pattern.test(userAgent))) {
       return false; // Verified bot, allow
     }
-    
+
     return BOT_PATTERNS.some(pattern => pattern.test(userAgent));
   },
 
   handler: function(req, res, next) {
     const options = req._pluginOptions?.['bot-detection'] || DEFAULT_OPTIONS;
-    
+
     const userAgent = req.headers['user-agent'] || '';
     const isBot = this.isBot(userAgent);
 
@@ -53,7 +53,7 @@ export default {
       if (options.logBlocked) {
         logger.warn(`Blocked bot: ${userAgent} from ${req.ip}`);
       }
-      
+
       return res.status(403).json({
         error: 'Forbidden',
         message: 'Automated requests not allowed'
@@ -63,7 +63,7 @@ export default {
     // Add bot info to request
     req.isBot = isBot;
     req.userAgent = userAgent;
-    
+
     next();
   }
 };

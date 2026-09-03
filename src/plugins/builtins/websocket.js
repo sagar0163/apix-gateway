@@ -18,9 +18,9 @@ export default {
 
   // Create WebSocket proxy
   createProxy(server, options) {
-    const wss = new WebSocketServer({ 
+    const wss = new WebSocketServer({
       noServer: true,
-      maxPayload: options.maxPayload 
+      maxPayload: options.maxPayload
     });
 
     wss.on('connection', (ws, req) => {

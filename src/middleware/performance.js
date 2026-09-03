@@ -64,18 +64,18 @@ export const compression = (options = {}) => {
 
     res.json = (data) => {
       const jsonStr = JSON.stringify(data);
-      
+
       // Only compress if above threshold
       if (jsonStr.length > threshold) {
         const compressed = compress(jsonStr);
-        
+
         res.set('Content-Encoding', 'gzip');
         res.set('Vary', 'Accept-Encoding');
-        
+
         // Add compression ratio header
         const ratio = ((compressed.length / jsonStr.length) * 100).toFixed(1);
         res.set('X-Compression-Ratio', `${ratio}%`);
-        
+
         originalSend(compressed);
       } else {
         originalSend(jsonStr);
@@ -117,7 +117,7 @@ export const responseCacheMiddleware = (options = {}) => {
         // Set cache headers
         res.set('X-Cache', 'HIT');
         res.set('X-Cache-Age', Math.floor(age / 1000).toString());
-        
+
         // Set cached headers
         if (headers) {
           Object.entries(headers).forEach(([k, v]) => res.set(k, v));
@@ -199,7 +199,7 @@ export const requestDeduplication = (options = {}) => {
           });
           originalJson(data);
         };
-        
+
         res.on('error', reject);
       });
 

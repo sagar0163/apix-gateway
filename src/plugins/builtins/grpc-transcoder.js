@@ -34,14 +34,14 @@ export default {
   // Transcode HTTP to gRPC
   async transcoder(req, res, next) {
     const options = req._pluginOptions?.['grpc-transcoder'] || DEFAULT_OPTIONS;
-    
+
     // Only handle /grpc/ prefixed routes
     if (!req.path.startsWith('/grpc/')) {
       return next();
     }
 
     const [, , service, method] = req.path.split('/');
-    
+
     if (!service || !method) {
       return res.status(400).json({ error: 'Invalid gRPC path' });
     }
@@ -82,10 +82,10 @@ export default {
     const reqStream = client.request(headers);
 
     let responseData = '';
-    
+
     reqStream.on('response', (responseHeaders) => {
       res.status(responseHeaders[':status'] || 200);
-      
+
       // Forward response headers
       Object.entries(responseHeaders).forEach(([key, value]) => {
         if (!key.startsWith(':')) {
@@ -100,7 +100,7 @@ export default {
 
     reqStream.on('end', () => {
       client.close();
-      
+
       try {
         const parsed = JSON.parse(responseData);
         res.json(parsed);

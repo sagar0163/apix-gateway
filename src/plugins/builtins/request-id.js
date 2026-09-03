@@ -17,23 +17,23 @@ export default {
 
   generateId(type = 'uuid') {
     switch (type) {
-      case 'uuid':
-        return crypto.randomUUID();
-      case 'random':
-        return crypto.randomBytes(16).toString('hex');
-      case 'timestamp':
-        return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-      default:
-        return crypto.randomUUID();
+    case 'uuid':
+      return crypto.randomUUID();
+    case 'random':
+      return crypto.randomBytes(16).toString('hex');
+    case 'timestamp':
+      return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    default:
+      return crypto.randomUUID();
     }
   },
 
   handler(req, res, next) {
     const options = req._pluginOptions?.['request-id'] || DEFAULT_OPTIONS;
-    
+
     // Check for existing ID or generate new
     let requestId = req.headers[options.headerName?.toLowerCase()] || req.headers['x-request-id'];
-    
+
     if (!requestId) {
       requestId = this.generateId(options.generateFn);
     }

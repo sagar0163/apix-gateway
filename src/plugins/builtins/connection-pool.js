@@ -32,7 +32,7 @@ export default {
   // Initialize connection pool agents
   init(options) {
     const opts = { ...DEFAULT_OPTIONS, ...options };
-    
+
     // HTTP agent
     agents.http = new http.Agent({
       maxSockets: opts.maxSockets,
@@ -42,7 +42,7 @@ export default {
       keepAlive: opts.keepAlive,
       keepAliveMsecs: opts.keepAliveMsecs
     });
-    
+
     // HTTPS agent with mutual TLS support
     agents.https = new https.Agent({
       maxSockets: opts.maxSockets,
@@ -57,7 +57,7 @@ export default {
       ca: opts.ca,
       rejectUnauthorized: opts.rejectUnauthorized !== false
     });
-    
+
     logger.info('Connection pool initialized', {
       maxSockets: opts.maxSockets,
       keepAlive: opts.keepAlive

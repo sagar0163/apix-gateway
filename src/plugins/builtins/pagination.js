@@ -20,11 +20,11 @@ export default {
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.pagination || DEFAULT_OPTIONS;
-    
+
     // Extract pagination params
     const page = parseInt(req.query[options.paramPage]) || 1;
     let limit = parseInt(req.query[options.paramLimit]) || options.defaultLimit;
-    
+
     // Clamp limit
     limit = Math.min(limit, options.maxLimit);
     const offset = (page - 1) * limit;
@@ -43,21 +43,21 @@ export default {
     res.json = (body) => {
       // Check if body is array or has items
       let items = Array.isArray(body) ? body : body?.data || body?.items || [];
-      
+
       if (!Array.isArray(items)) {
         return originalJson(body);
       }
 
       // Paginate if needed
       const total = items.length;
-      
+
       if (total > limit) {
         items = items.slice(offset, offset + limit);
       }
 
       // Add pagination metadata
       const totalPages = Math.ceil(total / limit);
-      
+
       const response = Array.isArray(body) ? items : {
         ...body,
         data: items,

@@ -26,21 +26,21 @@ export default {
   getTimeKey(trackBy) {
     const now = new Date();
     switch (trackBy) {
-      case 'minute':
-        return `${now.toISOString().slice(0, 16)}`; // YYYY-MM-DDTHH:MM
-      case 'hour':
-        return `${now.toISOString().slice(0, 13)}`; // YYYY-MM-DDTHH
-      case 'day':
-        return now.toISOString().slice(0, 10); // YYYY-MM-DD
-      default:
-        return now.toISOString().slice(0, 13);
+    case 'minute':
+      return `${now.toISOString().slice(0, 16)}`; // YYYY-MM-DDTHH:MM
+    case 'hour':
+      return `${now.toISOString().slice(0, 13)}`; // YYYY-MM-DDTHH
+    case 'day':
+      return now.toISOString().slice(0, 10); // YYYY-MM-DD
+    default:
+      return now.toISOString().slice(0, 13);
     }
   },
 
   // Record request
   record(req, res) {
     const key = this.getTimeKey('hour');
-    
+
     if (!stats.requests.has(key)) {
       stats.requests.set(key, {
         count: 0,
@@ -53,10 +53,10 @@ export default {
 
     const hourStats = stats.requests.get(key);
     hourStats.count++;
-    
+
     const contentLength = parseInt(res.get('content-length')) || 0;
     const reqLength = parseInt(req.headers['content-length']) || 0;
-    
+
     hourStats.bandwidth.up += reqLength;
     hourStats.bandwidth.down += contentLength;
     stats.bandwidth.up += reqLength;
@@ -68,7 +68,7 @@ export default {
 
     // Track paths
     hourStats.paths[req.path] = (hourStats.paths[req.path] || 0) + 1;
-    
+
     // Track clients
     const client = req.ip || 'unknown';
     hourStats.clients[client] = (hourStats.clients[client] || 0) + 1;
@@ -82,7 +82,7 @@ export default {
     // Calculate top paths/clients from last hour
     const keys = Array.from(stats.requests.keys()).sort().slice(-1);
     let paths = {}, clients = {};
-    
+
     for (const key of keys) {
       const s = stats.requests.get(key);
       Object.entries(s.paths).forEach(([p, c]) => {
@@ -125,7 +125,7 @@ export default {
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['traffic-stats'] || DEFAULT_OPTIONS;
-    
+
     // Record on response finish
     res.on('finish', () => {
       this.record(req, res);

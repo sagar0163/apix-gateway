@@ -19,7 +19,7 @@ export default {
 
     // Check Content-Length header
     const contentLength = parseInt(req.headers['content-length'] || '0');
-    
+
     if (contentLength > options.maxBodySize) {
       logger.warn(`Request body too large: ${contentLength} bytes (max: ${options.maxBodySize})`);
       return res.status(options.errorCode).json({
@@ -46,7 +46,7 @@ export default {
     if (options.includePayload) {
       let bodySize = 0;
       const originalOn = req.on.bind(req);
-      
+
       req.on = (event, listener) => {
         if (event === 'data') {
           originalOn('data', (chunk) => {

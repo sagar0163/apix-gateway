@@ -16,10 +16,10 @@ export default {
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.compression || DEFAULT_OPTIONS;
-    
+
     // Check if client accepts compression
     const acceptEncoding = req.headers['accept-encoding'] || '';
-    
+
     if (!acceptEncoding.includes('gzip') && !acceptEncoding.includes('deflate')) {
       return next();
     }
@@ -38,8 +38,8 @@ export default {
         gzip: { level: options.level, memLevel: options.memLevel },
         deflate: { level: options.level }
       };
-      return encoding.includes('gzip') 
-        ? zlib.createGzip(opts.gzip) 
+      return encoding.includes('gzip')
+        ? zlib.createGzip(opts.gzip)
         : zlib.createDeflate(opts.deflate);
     };
 
@@ -62,15 +62,15 @@ export default {
       // Determine encoding
       const acceptEncoding = req.headers['accept-encoding'] || '';
       const encoding = acceptEncoding.includes('gzip') ? 'gzip' : 'deflate';
-      
+
       // Compress
       const compressor = createCompressor(encoding);
-      
+
       res.set('Content-Encoding', encoding);
       res.removeHeader('Content-Length');
 
       // Handle compressed stream
-      const compressed = Buffer.isBuffer(body) 
+      const compressed = Buffer.isBuffer(body)
         ? compressor.finish(() => body)
         : body;
 
@@ -79,14 +79,14 @@ export default {
       } else {
         // Stream compression
         transformed = true;
-        
+
         const chunkBuffer = [];
         compressor.on('data', (chunk) => chunkBuffer.push(chunk));
         compressor.on('end', () => {
           res.set('Content-Length', chunkBuffer.reduce((a, b) => a + b.length, 0));
           originalSend(Buffer.concat(chunkBuffer));
         });
-        
+
         if (Buffer.isBuffer(body)) {
           compressor.end(body);
         } else {

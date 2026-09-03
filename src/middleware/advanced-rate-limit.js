@@ -11,17 +11,17 @@ const DEFAULT_OPTIONS = {
   // User-based limits
   userDefault: 100,
   userMax: 10000,
-  
+
   // Token bucket settings
   tokenRefillRate: 10, // tokens per second
   tokenCapacity: 100,
-  
+
   // Sliding window
   windowMs: 60000,
-  
+
   // Redis support (optional)
   useRedis: false,
-  
+
   // Dynamic limits
   enableDynamic: true,
   priorityLevels: {
@@ -44,11 +44,11 @@ const getUserTier = (req) => {
 const getUserLimit = (req) => {
   const tier = getUserTier(req);
   const tierLimits = DEFAULT_OPTIONS.priorityLevels[tier] || DEFAULT_OPTIONS.priorityLevels.free;
-  
+
   // Check for custom user limit
   const userId = req.user?.id || req.ip;
   const customLimit = userRateLimits.get(userId);
-  
+
   return customLimit || tierLimits;
 };
 
@@ -60,27 +60,27 @@ class TokenBucket {
     this.tokens = capacity;
     this.lastRefill = Date.now();
   }
-  
+
   consume(tokens = 1) {
     this.refill();
-    
+
     if (this.tokens >= tokens) {
       this.tokens -= tokens;
       return { allowed: true, remaining: this.tokens };
     }
-    
-    return { 
-      allowed: false, 
+
+    return {
+      allowed: false,
       remaining: this.tokens,
       retryAfter: Math.ceil((tokens - this.tokens) / this.refillRate)
     };
   }
-  
+
   refill() {
     const now = Date.now();
     const elapsed = (now - this.lastRefill) / 1000;
     const tokensToAdd = elapsed * this.refillRate;
-    
+
     this.tokens = Math.min(this.capacity, this.tokens + tokensToAdd);
     this.lastRefill = now;
   }
@@ -90,10 +90,10 @@ class TokenBucket {
 const slidingWindowCheck = (key, limit, windowMs) => {
   const now = Date.now();
   const window = slidingWindows.get(key) || { requests: [], count: 0 };
-  
+
   // Remove old requests
   const validRequests = window.requests.filter(t => now - t < windowMs);
-  
+
   if (validRequests.length >= limit) {
     return {
       allowed: false,
@@ -101,11 +101,11 @@ const slidingWindowCheck = (key, limit, windowMs) => {
       resetAt: validRequests[0] + windowMs
     };
   }
-  
+
   // Add current request
   validRequests.push(now);
   slidingWindows.set(key, { requests: validRequests, count: validRequests.length });
-  
+
   return {
     allowed: true,
     remaining: limit - validRequests.length,
@@ -121,53 +121,53 @@ export const createAdvancedRateLimiter = (options = {}) => {
     const userId = req.user?.id || req.ip;
     const tier = getUserTier(req);
     const limits = getUserLimit(req);
-    
+
     // Strategy selection
     const strategy = req.headers['x-rate-limit-strategy'] || 'token-bucket';
-    
+
     let result;
-    
+
     switch (strategy) {
-      case 'token-bucket':
-        // Token bucket algorithm
-        if (!tokenBuckets.has(userId)) {
-          tokenBuckets.set(userId, new TokenBucket(
-            limits.burst || config.tokenCapacity,
-            config.tokenRefillRate
-          ));
-        }
-        
-        const bucket = tokenBuckets.get(userId);
-        result = bucket.consume(1);
-        break;
-        
-      case 'sliding-window':
-        // Sliding window algorithm
-        result = slidingWindowCheck(
-          `${tier}:${userId}`,
-          limits.limit,
-          config.windowMs
-        );
-        break;
-        
-      case 'fixed-window':
-      default:
-        // Fixed window (simpler)
-        const windowKey = `${tier}:${userId}:${Math.floor(Date.now() / config.windowMs)}`;
-        result = slidingWindowCheck(windowKey, limits.limit, config.windowMs);
-        break;
+    case 'token-bucket':
+      // Token bucket algorithm
+      if (!tokenBuckets.has(userId)) {
+        tokenBuckets.set(userId, new TokenBucket(
+          limits.burst || config.tokenCapacity,
+          config.tokenRefillRate
+        ));
+      }
+
+      const bucket = tokenBuckets.get(userId);
+      result = bucket.consume(1);
+      break;
+
+    case 'sliding-window':
+      // Sliding window algorithm
+      result = slidingWindowCheck(
+        `${tier}:${userId}`,
+        limits.limit,
+        config.windowMs
+      );
+      break;
+
+    case 'fixed-window':
+    default:
+      // Fixed window (simpler)
+      const windowKey = `${tier}:${userId}:${Math.floor(Date.now() / config.windowMs)}`;
+      result = slidingWindowCheck(windowKey, limits.limit, config.windowMs);
+      break;
     }
-    
+
     // Set rate limit headers
     res.set('X-RateLimit-Limit', (limits.limit || config.userDefault).toString());
     res.set('X-RateLimit-Remaining', result.remaining.toString());
     res.set('X-RateLimit-Reset', Math.ceil((result.resetAt || Date.now() + config.windowMs) / 1000).toString());
     res.set('X-RateLimit-Strategy', strategy);
     res.set('X-RateLimit-Tier', tier);
-    
+
     if (!result.allowed) {
       logger.warn(`Rate limit exceeded for ${userId} (${tier}): ${result.remaining}/${limits.limit}`);
-      
+
       return res.status(429).json({
         error: 'Too Many Requests',
         message: `Rate limit exceeded. Tier: ${tier}`,
@@ -178,7 +178,7 @@ export const createAdvancedRateLimiter = (options = {}) => {
         strategy
       });
     }
-    
+
     next();
   };
 };
@@ -194,10 +194,10 @@ export const getRateLimitStatus = (userId, tier = 'free') => {
   const limits = DEFAULT_OPTIONS.priorityLevels[tier] || DEFAULT_OPTIONS.priorityLevels.free;
   const custom = userRateLimits.get(userId);
   const effective = custom?.limit || limits.limit;
-  
+
   let bucketInfo = null;
   let windowInfo = null;
-  
+
   // Get token bucket status
   if (tokenBuckets.has(userId)) {
     const bucket = tokenBuckets.get(userId);
@@ -206,7 +206,7 @@ export const getRateLimitStatus = (userId, tier = 'free') => {
       capacity: bucket.capacity
     };
   }
-  
+
   // Get sliding window status
   const windowKey = `${tier}:${userId}`;
   if (slidingWindows.has(windowKey)) {
@@ -216,7 +216,7 @@ export const getRateLimitStatus = (userId, tier = 'free') => {
       limit: effective
     };
   }
-  
+
   return {
     userId,
     tier,

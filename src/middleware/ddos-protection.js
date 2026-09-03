@@ -13,20 +13,20 @@ const config = {
   // Requests per window
   requestsPerWindow: parseInt(process.env.DDOS_REQUESTS_PER_WINDOW || '100'),
   windowMs: parseInt(process.env.DDOS_WINDOW_MS || '60000'),
-  
+
   // Block duration
   blockDurationMs: parseInt(process.env.DDOS_BLOCK_DURATION || '300000'), // 5 minutes
-  
+
   // Suspicious thresholds
   suspicious4xxThreshold: parseInt(process.env.DDOS_4XX_THRESHOLD || '20'),
   suspicious5xxThreshold: parseInt(process.env.DDOS_5XX_THRESHOLD || '10'),
-  
+
   // Request size anomalies
   maxRequestSize: parseInt(process.env.DDOS_MAX_REQUEST_SIZE || '10485760'), // 10MB
-  
+
   // Slowloris protection
   slowlorisTimeout: parseInt(process.env.DDOS_SLOWLORIS_TIMEOUT || '15000'),
-  
+
   // Challenge settings
   challengeEnabled: process.env.DDOS_CHALLENGE === 'true',
   challengeCookieName: 'ddos_challenge',
@@ -36,7 +36,7 @@ const config = {
 // Track request
 const trackRequest = (ip, type = 'request') => {
   const now = Date.now();
-  
+
   if (!ipTracker.has(ip)) {
     ipTracker.set(ip, {
       requests: [],
@@ -49,9 +49,9 @@ const trackRequest = (ip, type = 'request') => {
       lastRequest: now
     });
   }
-  
+
   const tracker = ipTracker.get(ip);
-  
+
   // Check if blocked
   if (tracker.blocked && now < tracker.blockExpires) {
     return { blocked: true, remaining: tracker.blockExpires - now };
@@ -61,15 +61,15 @@ const trackRequest = (ip, type = 'request') => {
     tracker.blockExpires = 0;
     tracker.requests = [];
   }
-  
+
   // Add request to window
   tracker.requests.push(now);
   tracker.requestsCount++;
   tracker.lastRequest = now;
-  
+
   // Clean old requests
   tracker.requests = tracker.requests.filter(t => now - t < config.windowMs);
-  
+
   return { blocked: false };
 };
 
@@ -77,7 +77,7 @@ const trackRequest = (ip, type = 'request') => {
 const trackError = (ip, statusCode) => {
   const tracker = ipTracker.get(ip);
   if (!tracker) return;
-  
+
   if (statusCode >= 400 && statusCode < 500) {
     tracker.errors4xx++;
   } else if (statusCode >= 500) {
@@ -89,14 +89,14 @@ const trackError = (ip, statusCode) => {
 const blockIP = (ip, reason) => {
   const tracker = ipTracker.get(ip);
   if (!tracker) return;
-  
-  tracker.blocked = true;
-  tracker.blockExpires = Date.now() + config.blockD
 
-duration;
-  
+  tracker.blocked = true;
+  tracker.blockExpires = Date.now() + config.blockD;
+
+  duration;
+
   logger.warn(`Blocked IP ${ip}: ${reason}`);
-  
+
   // Add to suspicious activity
   suspiciousActivity.set(ip, {
     reason,
@@ -110,7 +110,7 @@ const generateChallenge = (ip) => {
   const expires = Date.now() + 60000; // 1 minute
   const payload = `${ip}:${expires}:${config.challengeSecret}`;
   const token = crypto.createHash('sha256').update(payload).digest('hex').slice(0, 32);
-  
+
   return {
     token,
     expires,
@@ -121,7 +121,7 @@ const generateChallenge = (ip) => {
 // Verify challenge
 const verifyChallenge = (token, ip) => {
   if (!token) return false;
-  
+
   // In production, store challenges in Redis with TTL
   return true; // Simplified
 };
@@ -136,7 +136,7 @@ export const ddosProtection = (options = {}) => {
   return (req, res, next) => {
     const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
     const now = Date.now();
-    
+
     // Check challenge cookie first
     if (enableChallenge) {
       const challengeCookie = req.cookies?.[config.challengeCookieName];
@@ -153,17 +153,17 @@ export const ddosProtection = (options = {}) => {
         }
       }
     }
-    
+
     // Track request
     const result = trackRequest(ip);
-    
+
     // Check if blocked
     if (result.blocked) {
       logger.warn(`Blocked request from ${ip}, remaining: ${result.remaining}ms`);
-      
+
       res.set('X-Rate-Limit-Blocked', 'true');
       res.set('Retry-After', Math.ceil(result.remaining / 1000).toString());
-      
+
       return res.status(429).json({
         error: 'Too Many Requests',
         message: 'You have been temporarily blocked due to suspicious activity',
@@ -171,7 +171,7 @@ export const ddosProtection = (options = {}) => {
         retryAfter: Math.ceil(result.remaining / 1000)
       });
     }
-    
+
     // Check for slowloris-style requests (incomplete headers)
     if (enableSlowloris) {
       req.setTimeout(config.slowlorisTimeout, () => {
@@ -180,11 +180,11 @@ export const ddosProtection = (options = {}) => {
         blockIP(ip, 'slowloris attack');
       });
     }
-    
+
     // Track response status
     res.on('finish', () => {
       trackError(ip, res.statusCode);
-      
+
       // Check for suspicious error patterns
       const tracker = ipTracker.get(ip);
       if (tracker) {
@@ -198,7 +198,7 @@ export const ddosProtection = (options = {}) => {
         }
       }
     });
-    
+
     // Set headers
     const tracker = ipTracker.get(ip);
     if (tracker) {
@@ -206,7 +206,7 @@ export const ddosProtection = (options = {}) => {
       res.set('X-RateLimit-Remaining', Math.max(0, config.requestsPerWindow - tracker.requests.length).toString());
       res.set('X-RateLimit-Reset', Math.ceil((now + config.windowMs) / 1000).toString());
     }
-    
+
     next();
   };
 };
@@ -215,7 +215,7 @@ export const ddosProtection = (options = {}) => {
 export const getBlockedIPs = () => {
   const blocked = [];
   const now = Date.now();
-  
+
   for (const [ip, tracker] of ipTracker.entries()) {
     if (tracker.blocked && now < tracker.blockExpires) {
       blocked.push({
@@ -225,7 +225,7 @@ export const getBlockedIPs = () => {
       });
     }
   }
-  
+
   return blocked;
 };
 
@@ -253,9 +253,9 @@ export const ddosStats = () => {
   let totalRequests = 0;
   let blockedIPs = 0;
   let activeIPs = 0;
-  
+
   const now = Date.now();
-  
+
   for (const [, tracker] of ipTracker.entries()) {
     totalRequests += tracker.requestsCount;
     if (tracker.blocked && now < tracker.blockExpires) {
@@ -265,7 +265,7 @@ export const ddosStats = () => {
       activeIPs++;
     }
   }
-  
+
   return {
     totalRequests,
     activeIPs,

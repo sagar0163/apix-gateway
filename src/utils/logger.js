@@ -15,14 +15,14 @@ const structuredFormat = printf(({ level, message, timestamp, stack, ...metadata
     message: message || '',
     ...metadata
   };
-  
+
   if (stack) {
     log.error = {
       message: message,
       stack: stack
     };
   }
-  
+
   return JSON.stringify(log);
 });
 
@@ -49,15 +49,15 @@ export const logger = winston.createLogger({
   },
   format: isProduction || isStructured
     ? combine(
-        timestamp(),
-        errors({ stack: true }),
-        structuredFormat
-      )
+      timestamp(),
+      errors({ stack: true }),
+      structuredFormat
+    )
     : combine(
-        timestamp(),
-        errors({ stack: true }),
-        devFormat
-      ),
+      timestamp(),
+      errors({ stack: true }),
+      devFormat
+    ),
   transports: [
     // Console transport
     new winston.transports.Console({
@@ -65,7 +65,7 @@ export const logger = winston.createLogger({
         ? structuredFormat
         : combine(colorize(), simple())
     }),
-    
+
     // Error file
     new winston.transports.File({
       filename: 'logs/error.log',
@@ -73,7 +73,7 @@ export const logger = winston.createLogger({
       maxsize: 10 * 1024 * 1024, // 10MB
       maxFiles: 5
     }),
-    
+
     // Combined log
     new winston.transports.File({
       filename: 'logs/combined.log',
@@ -81,12 +81,12 @@ export const logger = winston.createLogger({
       maxFiles: 5
     })
   ],
-  
+
   // Handle uncaught exceptions
   exceptionHandlers: [
     new winston.transports.File({ filename: 'logs/exceptions.log' })
   ],
-  
+
   // Handle unhandled promise rejections
   rejectionHandlers: [
     new winston.transports.File({ filename: 'logs/rejections.log' })

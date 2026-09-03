@@ -27,14 +27,14 @@ export function bumpVersion(version, type) {
   const v = parseVersion(version);
 
   switch (type) {
-    case 'major':
-      return `${v.major + 1}.0.0`;
-    case 'minor':
-      return `${v.major}.${v.minor + 1}.0`;
-    case 'patch':
-      return `${v.major}.${v.minor}.${v.patch + 1}`;
-    default:
-      throw new Error(`Invalid bump type: ${type}`);
+  case 'major':
+    return `${v.major + 1}.0.0`;
+  case 'minor':
+    return `${v.major}.${v.minor + 1}.0`;
+  case 'patch':
+    return `${v.major}.${v.minor}.${v.patch + 1}`;
+  default:
+    throw new Error(`Invalid bump type: ${type}`);
   }
 }
 

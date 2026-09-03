@@ -9,20 +9,20 @@ export const ratelimit = (req, res, next) => {
   const now = Date.now();
   const windowMs = config.rateLimit.windowMs || 60000;
   const maxRequests = config.rateLimit.maxRequests || 100;
-  
+
   if (!requests.has(key)) {
     requests.set(key, { count: 1, resetTime: now + windowMs });
     return next();
   }
-  
+
   const record = requests.get(key);
-  
+
   if (now > record.resetTime) {
     record.count = 1;
     record.resetTime = now + windowMs;
     return next();
   }
-  
+
   if (record.count >= maxRequests) {
     logger.warn(`Rate limit exceeded for ${key}`);
     return res.status(429).json({
@@ -30,7 +30,7 @@ export const ratelimit = (req, res, next) => {
       retryAfter: Math.ceil((record.resetTime - now) / 1000)
     });
   }
-  
+
   record.count++;
   next();
 };

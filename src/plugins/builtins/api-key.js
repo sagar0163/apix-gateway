@@ -42,7 +42,7 @@ export default {
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['api-key'] || DEFAULT_OPTIONS;
-    
+
     // Try header first, then query param
     let apiKey = req.headers[options.headerName] || req.query[options.queryParam];
 
@@ -50,9 +50,9 @@ export default {
       if (options.passthrough) {
         return next();
       }
-      return res.status(401).json({ 
-        error: 'Unauthorized', 
-        message: 'API key required' 
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'API key required'
       });
     }
 
@@ -62,26 +62,26 @@ export default {
       // Check if key hash matches (for hashed keys)
       const hashedKey = crypto.createHash('sha256').update(apiKey).digest('hex');
       const hashedKeyData = apiKeys.get(hashedKey);
-      
+
       if (!hashedKeyData) {
         logger.warn('Invalid API key:', apiKey.slice(0, 8) + '...');
         if (options.passthrough) {
           return next();
         }
-        return res.status(401).json({ 
-          error: 'Unauthorized', 
-          message: 'Invalid API key' 
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Invalid API key'
         });
       }
-      
+
       apiKey = hashedKey;
     }
 
     // Check expiration
     if (keyData.expiresAt && keyData.expiresAt < Date.now()) {
-      return res.status(401).json({ 
-        error: 'Unauthorized', 
-        message: 'API key expired' 
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'API key expired'
       });
     }
 

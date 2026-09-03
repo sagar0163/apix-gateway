@@ -20,7 +20,7 @@ export default {
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['jwt-auth'] || DEFAULT_OPTIONS;
-    
+
     // Check if public path with proper prefix matching
     const isPublic = options.publicPaths?.some(p => {
       if (req.path === p) return true;
@@ -33,7 +33,7 @@ export default {
     }
 
     const authHeader = req.headers[options.headerName?.toLowerCase()];
-    
+
     if (!authHeader) {
       if (options.passthrough) {
         return next();
@@ -42,7 +42,7 @@ export default {
       return res.status(401).json({ error: 'Unauthorized', message: 'No token provided' });
     }
 
-    const token = authHeader.startsWith(options.headerPrefix) 
+    const token = authHeader.startsWith(options.headerPrefix)
       ? authHeader.slice(options.headerPrefix.length + 1)
       : authHeader;
 
@@ -66,9 +66,9 @@ export default {
         next();
         return;
       }
-      res.status(401).json({ 
-        error: 'Unauthorized', 
-        message: 'Invalid or expired token' 
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid or expired token'
       });
     }
   }

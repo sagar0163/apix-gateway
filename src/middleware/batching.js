@@ -16,7 +16,7 @@ const DEFAULT_OPTIONS = {
 const processBatch = async (key, items, handler) => {
   try {
     const results = await handler(items);
-    
+
     // Send individual responses
     items.forEach((item, index) => {
       if (item.res && !item.res.headersSent) {
@@ -44,7 +44,7 @@ export const requestBatching = (options = {}) => {
     }
 
     const key = config.keyGenerator(req);
-    
+
     if (!batchQueue.has(key)) {
       batchQueue.set(key, {
         items: [],
@@ -53,19 +53,19 @@ export const requestBatching = (options = {}) => {
     }
 
     const batch = batchQueue.get(key);
-    
+
     // Add to batch
     batch.items.push({ req, res, body: req.body, timestamp: Date.now() });
 
     // Process immediately if batch is full
     if (batch.items.length >= config.maxBatchSize) {
       logger.debug(`Batch full for ${key}: ${batch.items.length} items`);
-      
+
       if (batch.timeout) {
         clearTimeout(batch.timeout);
         batch.timeout = null;
       }
-      
+
       const items = batch.items;
       batch.items = [];
       return processBatch(key, items, config.batchHandler);
@@ -77,7 +77,7 @@ export const requestBatching = (options = {}) => {
         const items = batch.items;
         batch.items = [];
         batch.timeout = null;
-        
+
         if (items.length > 0) {
           logger.debug(`Batch timeout for ${key}: ${items.length} items`);
           processBatch(key, items, config.batchHandler);

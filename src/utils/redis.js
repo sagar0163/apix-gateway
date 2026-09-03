@@ -54,7 +54,7 @@ class RedisManager {
 
       // Add a connection timeout to prevent startup hangs
       const connectPromise = this.client.connect();
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Redis connection timed out')), 2000)
       );
 

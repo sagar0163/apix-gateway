@@ -29,7 +29,7 @@ const memoryCacheOrder = [];
 // Helper: Generate cache key
 function generateCacheKey(req, options) {
   const parts = [options.keyPrefix, req.method, req.path];
-  
+
   // Add vary headers
   if (options.varyBy) {
     options.varyBy.forEach(header => {
@@ -37,12 +37,12 @@ function generateCacheKey(req, options) {
       if (value) parts.push(value);
     });
   }
-  
+
   // Add query params if present
   if (Object.keys(req.query || {}).length > 0) {
     parts.push(JSON.stringify(req.query));
   }
-  
+
   return parts.join(':');
 }
 
@@ -50,7 +50,7 @@ function generateCacheKey(req, options) {
 function getFromMemory(key) {
   const item = memoryCache.get(key);
   if (!item) return null;
-  
+
   // Check expiry
   if (Date.now() > item.expiry) {
     memoryCache.delete(key);
@@ -58,7 +58,7 @@ function getFromMemory(key) {
     if (idx > -1) memoryCacheOrder.splice(idx, 1);
     return null;
   }
-  
+
   return item.value;
 }
 
@@ -69,7 +69,7 @@ function setToMemory(key, value, ttl) {
     const oldest = memoryCacheOrder.shift();
     if (oldest) memoryCache.delete(oldest);
   }
-  
+
   memoryCache.set(key, {
     value,
     expiry: Date.now() + (ttl * 1000),
@@ -85,7 +85,7 @@ function invalidateMemory(pattern) {
     memoryCacheOrder.length = 0;
     return;
   }
-  
+
   const regex = new RegExp(pattern);
   for (const key of memoryCache.keys()) {
     if (regex.test(key)) {
@@ -106,7 +106,7 @@ export default {
   async get(req, res, options) {
     const cacheKey = generateCacheKey(req, options);
     let cached;
-    
+
     // Try Redis first if enabled
     if (options.storage === 'redis' && redisManager.isReady()) {
       try {
@@ -119,7 +119,7 @@ export default {
         logger.error('Redis cache get error:', err.message);
       }
     }
-    
+
     // Fallback to memory
     if (!cached && options.storage === 'memory') {
       cached = getFromMemory(cacheKey);
@@ -127,12 +127,12 @@ export default {
         logger.debug(`Cache HIT (Memory): ${cacheKey}`);
       }
     }
-    
+
     if (!cached) {
       logger.debug(`Cache MISS: ${cacheKey}`);
       return null;
     }
-    
+
     return cached;
   },
 
@@ -140,7 +140,7 @@ export default {
   async set(req, res, options, data) {
     const cacheKey = generateCacheKey(req, options);
     const ttl = options.storage === 'redis' ? options.redis.ttl : options.ttl;
-    
+
     // Don't cache if explicitly disabled
     if (options.respectCacheControl) {
       const cacheControl = req.headers['cache-control'];
@@ -148,12 +148,12 @@ export default {
         return;
       }
     }
-    
+
     // Check if status should be cached
     if (!options.cacheByStatus.includes(res.statusCode)) {
       return;
     }
-    
+
     const cacheData = {
       statusCode: res.statusCode,
       headers: {
@@ -163,7 +163,7 @@ export default {
       },
       body: data
     };
-    
+
     // Store in Redis
     if (options.storage === 'redis' && redisManager.isReady()) {
       try {
@@ -173,7 +173,7 @@ export default {
         logger.error('Redis cache set error:', err.message);
       }
     }
-    
+
     // Store in memory
     if (options.storage === 'memory') {
       setToMemory(cacheKey, cacheData, ttl);
@@ -193,7 +193,7 @@ export default {
         logger.info('Cache cleared (Redis)');
       }
     }
-    
+
     // Memory invalidation
     invalidateMemory(pattern);
     logger.info(`Cache invalidated: ${pattern || 'all'}`);
@@ -210,18 +210,18 @@ export default {
         connected: redisManager.isReady()
       }
     };
-    
+
     return stats;
   },
 
   handler: async (req, res, next) => {
     const options = req._pluginOptions?.cache || DEFAULT_OPTIONS;
-    
+
     // Skip if disabled
     if (!options.enabled) {
       return next();
     }
-    
+
     // Skip excluded paths
     if (options.excludePaths?.some(p => {
       if (p.endsWith('*')) {
@@ -231,15 +231,15 @@ export default {
     })) {
       return next();
     }
-    
+
     // Skip non-GET/HEAD
     if (!['GET', 'HEAD'].includes(req.method)) {
       return next();
     }
-    
+
     // Try to get cached response
     const cached = await this.get(req, res, options);
-    
+
     if (cached) {
       // Set cached headers
       if (cached.headers) {
@@ -247,52 +247,52 @@ export default {
           if (value) res.setHeader(key, value);
         });
       }
-      
+
       // Add cache hit header
       res.setHeader('X-Cache', 'HIT');
-      
+
       // Return cached response
       if (req.method === 'HEAD') {
         return res.status(cached.statusCode).end();
       }
-      
+
       return res.status(cached.statusCode).send(cached.body);
     }
-    
+
     // Set cache miss header
     res.setHeader('X-Cache', 'MISS');
-    
+
     // Capture response
     const originalSend = res.send;
     const originalJson = res.json;
     const originalEnd = res.end;
-    
+
     const captureResponse = (data) => {
       // Store in cache (async, don't wait)
       this.set(req, res, options, data).catch(err => {
         logger.error('Cache set error:', err.message);
       });
-      
+
       return data;
     };
-    
+
     res.send = function(body) {
       captureResponse(body);
       return originalSend.call(this, body);
     };
-    
+
     res.json = function(data) {
       captureResponse(data);
       return originalJson.call(this, data);
     };
-    
+
     res.end = function(chunk) {
       if (chunk) {
         captureResponse(chunk);
       }
       return originalEnd.call(this, chunk);
     };
-    
+
     next();
   }
 };

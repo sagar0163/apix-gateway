@@ -46,7 +46,7 @@ export default {
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['request-mirror'] || DEFAULT_OPTIONS;
-    
+
     if (options.mirrorTargets.length === 0) {
       return next();
     }

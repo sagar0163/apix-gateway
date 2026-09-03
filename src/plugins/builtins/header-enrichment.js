@@ -53,16 +53,16 @@ export default {
       // Add response headers
       const options = req._headerEnrichment || {};
       const additionalHeaders = options.addResponseHeaders || {};
-      
+
       if (additionalHeaders[name]) {
         return originalSetHeader(name, additionalHeaders[name]);
       }
-      
+
       // Skip removed headers
       if (options.removeResponseHeaders?.includes(name)) {
         return;
       }
-      
+
       return originalSetHeader(name, value);
     };
 

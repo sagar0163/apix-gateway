@@ -41,7 +41,7 @@ export const createWebSocketServer = (server, options = {}) => {
 
     const clientId = crypto.randomUUID();
     const clientIp = req.socket.remoteAddress || req.headers['x-forwarded-for'];
-    
+
     // Store connection
     connections.set(clientId, {
       ws,
@@ -94,26 +94,26 @@ export const createWebSocketServer = (server, options = {}) => {
 
       try {
         const message = JSON.parse(data.toString());
-        
+
         // Handle message types
         switch (message.type) {
-          case 'ping':
-            ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
-            break;
-            
-          case 'subscribe':
-            // Subscribe to channels
-            logger.debug(`Client ${clientId} subscribed to ${message.channel}`);
-            break;
-            
-          case 'broadcast':
-            // Broadcast to all clients
-            broadcast(message.data, message.channel);
-            break;
-            
-          default:
-            // Emit event for custom handlers
-            ws.emit('message', message, clientId);
+        case 'ping':
+          ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+          break;
+
+        case 'subscribe':
+          // Subscribe to channels
+          logger.debug(`Client ${clientId} subscribed to ${message.channel}`);
+          break;
+
+        case 'broadcast':
+          // Broadcast to all clients
+          broadcast(message.data, message.channel);
+          break;
+
+        default:
+          // Emit event for custom handlers
+          ws.emit('message', message, clientId);
         }
       } catch (err) {
         logger.error('WebSocket message error:', err.message);
@@ -159,7 +159,7 @@ export const broadcast = (data, channel = null) => {
       sent++;
     }
   }
-  
+
   return sent;
 };
 
@@ -179,7 +179,7 @@ export const sendTo = (clientId, data) => {
 export const getConnectionStats = () => {
   const now = Date.now();
   const stats = [];
-  
+
   for (const [id, conn] of connections.entries()) {
     stats.push({
       id,
@@ -191,7 +191,7 @@ export const getConnectionStats = () => {
       bytesSent: conn.bytesSent
     });
   }
-  
+
   return {
     total: connections.size,
     connections: stats

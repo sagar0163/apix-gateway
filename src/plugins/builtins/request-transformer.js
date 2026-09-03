@@ -45,9 +45,9 @@ export default {
         req.body = options.transformBody(req.body);
       } catch (err) {
         logger.error('Body transformation error:', err);
-        return res.status(400).json({ 
-          error: 'Bad Request', 
-          message: 'Invalid request body transformation' 
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid request body transformation'
         });
       }
     }

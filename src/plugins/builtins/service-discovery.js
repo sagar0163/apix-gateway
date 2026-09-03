@@ -21,15 +21,15 @@ export default {
   // Initialize
   async init(options) {
     switch (options.provider) {
-      case 'consul':
-        await this.initConsul(options);
-        break;
-      case 'kubernetes':
-        await this.initKubernetes(options);
-        break;
-      default:
-        // Static - just use fallback targets
-        break;
+    case 'consul':
+      await this.initConsul(options);
+      break;
+    case 'kubernetes':
+      await this.initKubernetes(options);
+      break;
+    default:
+      // Static - just use fallback targets
+      break;
     }
 
     // Start refresh interval
@@ -80,28 +80,28 @@ export default {
   getHealthyEndpoint(name) {
     const service = this.registry.get(name);
     if (!service || !service.endpoints.length) return null;
-    
+
     const idx = Math.floor(Math.random() * service.endpoints.length);
     return service.endpoints[idx];
   },
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['service-discovery'] || DEFAULT_OPTIONS;
-    
+
     // Extract service name from path (/service-name/...)
     const parts = req.path.split('/').filter(Boolean);
     const serviceName = parts[0];
 
     if (options.services[serviceName]) {
       const endpoint = this.getHealthyEndpoint(serviceName) || options.fallbackTargets[serviceName];
-      
+
       if (endpoint) {
         req._serviceDiscovery = {
           service: serviceName,
           endpoint,
           resolved: true
         };
-        
+
         res.set('X-Service-Discovery', serviceName);
       }
     }

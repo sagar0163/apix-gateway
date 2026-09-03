@@ -21,7 +21,7 @@ export default {
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.oauth2 || DEFAULT_OPTIONS;
-    
+
     // Public paths
     if (options.publicPaths?.some(p => req.path.startsWith(p))) {
       return next();
@@ -31,10 +31,10 @@ export default {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
       if (options.passthrough) return next();
-      return res.status(401).json({ 
-        error: 'Unauthorized', 
+      return res.status(401).json({
+        error: 'Unauthorized',
         challenge: 'Bearer realm="api"',
-        message: 'OAuth2 token required' 
+        message: 'OAuth2 token required'
       });
     }
 
@@ -43,7 +43,7 @@ export default {
 
     // If introspection endpoint configured, validate token
     if (options.introspectionEndpoint) {
-      axios.post(options.introspectionEndpoint, 
+      axios.post(options.introspectionEndpoint,
         new URLSearchParams({ token }),
         {
           auth: { username: options.clientId, password: options.clientSecret },

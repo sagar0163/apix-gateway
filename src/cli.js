@@ -100,12 +100,12 @@ function cmdRelease(type = 'auto') {
       `APIX Gateway  v${newVersion}`
     );
     fs.writeFileSync(indexPath, indexContent);
-    success(`Updated src/index.js version banner`);
+    success('Updated src/index.js version banner');
   }
 
   // 3. Generate changelog
   generateChangelog(ROOT, newVersion);
-  success(`Generated CHANGELOG.md`);
+  success('Generated CHANGELOG.md');
 
   // 4. Generate release notes
   generateReleaseNotes(ROOT, newVersion);
@@ -123,11 +123,11 @@ function cmdRelease(type = 'auto') {
     path.join(ROOT, 'VERSION.json'),
     JSON.stringify(versionData, null, 2) + '\n'
   );
-  success(`Generated VERSION.json`);
+  success('Generated VERSION.json');
 
   // 6. Stage all changes
   run('git add -A');
-  success(`Staged all changes`);
+  success('Staged all changes');
 
   // 7. Create commit
   const commitMsg = `release: v${newVersion}`;
@@ -341,42 +341,42 @@ ${c.yellow}Examples:${c.reset}
 const [,, command, ...args] = process.argv;
 
 switch (command) {
-  case 'version':
-  case 'v':
-    cmdVersion();
-    break;
-  case 'release':
-  case 'r':
-    cmdRelease(args[0] || 'auto');
-    break;
-  case 'changelog':
-  case 'cl':
-    cmdChangelog();
-    break;
-  case 'notes':
-  case 'n':
-    cmdNotes();
-    break;
-  case 'status':
-  case 's':
-    cmdStatus();
-    break;
-  case 'validate':
-  case 'val':
-    cmdValidate(args[0]);
-    break;
-  case 'sync':
-    cmdSync(args[0]);
-    break;
-  case 'dump':
-    await cmdDump();
-    break;
-  case 'help':
-  case 'h':
-  case '--help':
-  case undefined:
-    cmdHelp();
-    break;
-  default:
-    error(`Unknown command: ${command}. Run 'apix help' for usage.`);
+case 'version':
+case 'v':
+  cmdVersion();
+  break;
+case 'release':
+case 'r':
+  cmdRelease(args[0] || 'auto');
+  break;
+case 'changelog':
+case 'cl':
+  cmdChangelog();
+  break;
+case 'notes':
+case 'n':
+  cmdNotes();
+  break;
+case 'status':
+case 's':
+  cmdStatus();
+  break;
+case 'validate':
+case 'val':
+  cmdValidate(args[0]);
+  break;
+case 'sync':
+  cmdSync(args[0]);
+  break;
+case 'dump':
+  await cmdDump();
+  break;
+case 'help':
+case 'h':
+case '--help':
+case undefined:
+  cmdHelp();
+  break;
+default:
+  error(`Unknown command: ${command}. Run 'apix help' for usage.`);
 }

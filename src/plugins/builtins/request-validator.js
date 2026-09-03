@@ -34,7 +34,7 @@ export default {
     const options = req._pluginOptions?.['request-validator'] || DEFAULT_OPTIONS;
     const key = `${req.method}:${req.path}`;
     const schema = schemas.get(key) || options.schemas[key];
-    
+
     if (!schema) {
       return next(); // No schema defined for this route
     }

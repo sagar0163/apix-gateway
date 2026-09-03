@@ -135,20 +135,20 @@ function buildKey(req, options) {
   const prefix = options.keyPrefix || 'apix:ratelimit:';
 
   switch (options.keyStrategy) {
-    case 'ip':
-      return `${prefix}${req.ip}`;
-    case 'user':
-      return `${prefix}user:${req.user?.id || req.ip}`;
-    case 'apikey':
-      return `${prefix}apikey:${req.headers['x-api-key'] || req.ip}`;
-    case 'route':
-      return `${prefix}${req.path}:${req.ip}`;
-    case 'route-user':
-      return `${prefix}${req.path}:user:${req.user?.id || req.ip}`;
-    case 'composite':
-      return `${prefix}${req.path}:${req.method}:${req.user?.id || req.ip}`;
-    default:
-      return `${prefix}${req.ip}`;
+  case 'ip':
+    return `${prefix}${req.ip}`;
+  case 'user':
+    return `${prefix}user:${req.user?.id || req.ip}`;
+  case 'apikey':
+    return `${prefix}apikey:${req.headers['x-api-key'] || req.ip}`;
+  case 'route':
+    return `${prefix}${req.path}:${req.ip}`;
+  case 'route-user':
+    return `${prefix}${req.path}:user:${req.user?.id || req.ip}`;
+  case 'composite':
+    return `${prefix}${req.path}:${req.method}:${req.user?.id || req.ip}`;
+  default:
+    return `${prefix}${req.ip}`;
   }
 }
 

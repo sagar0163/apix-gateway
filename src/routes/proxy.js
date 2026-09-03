@@ -139,7 +139,7 @@ router.use('/', async (req, res, next) => {
 
   if (!proxy) {
     logger.info(`Creating new proxy instance for ${cacheKey}`);
-    
+
     // Determine if target uses HTTPS
     const targetUrl = new URL(target);
     const isHttps = targetUrl.protocol === 'https:';
@@ -236,7 +236,7 @@ router.use('/', async (req, res, next) => {
     });
 
     proxyCache.set(cacheKey, proxy);
-    
+
     // Periodic cleanup of very large caches
     if (proxyCache.size > 1000) {
       const firstKey = proxyCache.keys().next().value;

@@ -38,8 +38,8 @@ export default {
     return {
       ...metrics,
       uptime,
-      avgLatency: metrics.latency.count > 0 
-        ? Math.round(metrics.latency.sum / metrics.latency.count) 
+      avgLatency: metrics.latency.count > 0
+        ? Math.round(metrics.latency.sum / metrics.latency.count)
         : 0,
       rps: metrics.requests.total / (uptime / 1000)
     };
@@ -77,7 +77,7 @@ export default {
     const originalSend = res.send;
     res.send = (body) => {
       const status = res.statusCode;
-      
+
       metrics.requests.total++;
       metrics.requests.byStatus[status] = (metrics.requests.byStatus[status] || 0) + 1;
 

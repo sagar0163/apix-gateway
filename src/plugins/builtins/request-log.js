@@ -71,11 +71,11 @@ export default {
       // Write log
       if (options.json) {
         const logLine = JSON.stringify(logEntry);
-        
+
         if (options.file) {
           fs.appendFileSync(options.file, logLine + '\n');
         }
-        
+
         logger[options.logLevel](logLine);
       } else {
         logger[options.logLevel](

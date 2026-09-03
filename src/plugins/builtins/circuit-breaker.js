@@ -45,19 +45,19 @@ class CircuitStore {
   tryOpen(service, threshold) {
     return this._transition(service, (circuit) => {
       const now = Date.now();
-      
+
       // Reset window if expired
       if (now - circuit.windowStart > DEFAULT_OPTIONS.windowMs) {
         circuit.failures = 0;
         circuit.windowStart = now;
       }
-      
+
       if (circuit.state === STATE_OPEN) {
         return false;
       }
-      
+
       circuit.failures++;
-      
+
       if (circuit.failures >= threshold) {
         circuit.state = STATE_OPEN;
         circuit.nextAttempt = now + DEFAULT_OPTIONS.timeout;
@@ -72,9 +72,9 @@ class CircuitStore {
   recordSuccess(service) {
     return this._transition(service, (circuit) => {
       const wasHalfOpen = circuit.state === STATE_HALF_OPEN;
-      
+
       circuit.successes++;
-      
+
       if (wasHalfOpen && circuit.successes >= DEFAULT_OPTIONS.successThreshold) {
         circuit.state = STATE_CLOSED;
         circuit.failures = 0;
@@ -90,11 +90,11 @@ class CircuitStore {
   canProceed(service) {
     const circuit = this.getOrCreate(service);
     const now = Date.now();
-    
+
     if (circuit.state === STATE_CLOSED) {
       return { allowed: true, state: STATE_CLOSED };
     }
-    
+
     if (circuit.state === STATE_OPEN) {
       if (now >= circuit.nextAttempt) {
         // Transition to half-open
@@ -103,14 +103,14 @@ class CircuitStore {
         logger.info(`Circuit half-open for: ${service}`);
         return { allowed: true, state: STATE_HALF_OPEN };
       }
-      
+
       return {
         allowed: false,
         state: STATE_OPEN,
         retryAfter: Math.ceil((circuit.nextAttempt - now) / 1000)
       };
     }
-    
+
     // Half-open state allows one request
     return { allowed: true, state: STATE_HALF_OPEN };
   }
@@ -163,10 +163,10 @@ export default {
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['circuit-breaker'] || DEFAULT_OPTIONS;
     const service = req.headers['x-upstream-service'] || req.path.split('/')[2] || 'default';
-    
+
     // Check circuit state
     const check = circuitStore.canProceed(service);
-    
+
     if (!check.allowed) {
       logger.warn(`Circuit open for: ${service}, retry after ${check.retryAfter}s`);
       return res.status(503).json({
@@ -179,7 +179,7 @@ export default {
 
     // Wrap response to track outcomes
     const originalSend = res.send.bind(res);
-    
+
     res.send = function(body) {
       const status = res.statusCode || 200;
       const isError = status >= 500;

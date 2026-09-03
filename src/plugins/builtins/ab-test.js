@@ -16,7 +16,7 @@ export default {
 
   getVariant(req, experiment, options) {
     const { variants, cookie = 'ab-test' } = experiment;
-    
+
     const existing = req.cookies?.[cookie];
     if (existing && variants[existing] !== undefined) {
       return existing;
@@ -33,9 +33,9 @@ export default {
       .createHash('md5')
       .update(req.ip + experiment.name + Date.now().toString(36).slice(0, 5))
       .digest('hex');
-    
+
     const num = parseInt(hash.slice(0, 8), 16) % 100;
-    
+
     let cumulative = 0;
     for (const [variant, weight] of Object.entries(variants)) {
       cumulative += weight;
@@ -49,11 +49,11 @@ export default {
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['ab-test'] || DEFAULT_OPTIONS;
-    
+
     for (const [name, experiment] of Object.entries(options.experiments || {})) {
       if (req.path.startsWith(experiment.path || '/')) {
         const variant = this.getVariant(req, experiment, options);
-        
+
         req._abTest = {
           experiment: name,
           variant,

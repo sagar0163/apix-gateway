@@ -20,7 +20,7 @@ export const gracefulShutdown = async (server, options = {}) => {
 
   const shutdown = async (signal) => {
     logger.warn(`Received ${signal}, starting graceful shutdown...`);
-    
+
     // Stop accepting new connections
     server.close(() => {
       logger.info('HTTP server closed');
@@ -89,18 +89,18 @@ export const healthCheck = (options = {}) => {
       if (checkFunction) {
         const result = await Promise.race([
           checkFunction(),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Health check timeout')), timeout)
           )
         ]);
-        
+
         checks = { ...checks, ...result };
       }
 
       // Check memory usage
       const memUsage = process.memoryUsage();
       const heapUsedPercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
-      
+
       if (heapUsedPercent > 90) {
         status = 'unhealthy';
         checks.memoryIssue = `Heap usage at ${heapUsedPercent.toFixed(1)}%`;
@@ -110,14 +110,14 @@ export const healthCheck = (options = {}) => {
       const start = Date.now();
       await new Promise(resolve => setImmediate(resolve));
       const lag = Date.now() - start;
-      
+
       if (lag > 100) {
         status = 'degraded';
         checks.eventLoopLag = lag;
       }
 
       const statusCode = status === 'healthy' ? 200 : status === 'degraded' ? 200 : 503;
-      
+
       res.status(statusCode).json({
         status,
         ...checks
@@ -157,11 +157,11 @@ export const memoryLeakDetector = (options = {}) => {
   if (process.env.NODE_ENV === 'production') return;
 
   let lastMemory = process.memoryUsage();
-  
+
   setInterval(() => {
     const current = process.memoryUsage();
     const heapGrowth = current.heapUsed - lastMemory.heapUsed;
-    
+
     if (heapGrowth > threshold) {
       logger.warn(`Potential memory leak detected: ${(heapGrowth / 1024 / 1024).toFixed(2)}MB growth`);
       logger.warn('Memory stats:', {
@@ -170,7 +170,7 @@ export const memoryLeakDetector = (options = {}) => {
         rss: (current.rss / 1024 / 1024).toFixed(2) + 'MB'
       });
     }
-    
+
     lastMemory = current;
   }, interval);
 };

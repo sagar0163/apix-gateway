@@ -108,7 +108,7 @@ export default {
   extractContext(req) {
     const headers = req.headers;
     const options = this.options;
-    
+
     // Try W3C traceparent format first
     const traceparent = headers['traceparent'];
     if (traceparent) {
@@ -121,7 +121,7 @@ export default {
         };
       }
     }
-    
+
     // Fallback to custom headers
     for (const header of options.propagationHeaders) {
       const traceId = headers[header.toLowerCase()];
@@ -129,22 +129,22 @@ export default {
         return { traceId, parentSpanId: headers['x-span-id'] || null };
       }
     }
-    
+
     return null;
   },
 
   // Inject trace context into outgoing headers
   injectContext(req, span) {
     const headers = {};
-    
+
     // W3C traceparent format
     const flags = span.status === 'ok' ? '01' : '00';
     headers['traceparent'] = `00-${span.traceId}-${span.spanId}-${flags}`;
-    
+
     // Legacy headers
     headers['x-trace-id'] = span.traceId;
     headers['x-span-id'] = span.spanId;
-    
+
     return headers;
   },
 
@@ -155,7 +155,7 @@ export default {
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['distributed-trace'] || DEFAULT_OPTIONS;
-    
+
     // Check if we should sample this request
     if (!this.shouldSample()) {
       return next();
@@ -167,7 +167,7 @@ export default {
       `${req.method} ${req.path}`,
       existingContext?.traceId
     );
-    
+
     if (existingContext) {
       span.parentTraceId = existingContext.traceId;
     }
@@ -192,15 +192,15 @@ export default {
     const originalSend = res.send;
     res.send = function(body) {
       const traceId = req._trace?.traceId;
-      
+
       // Add trace headers
       res.set('x-trace-id', traceId);
       res.set('x-span-id', span.spanId);
-      
+
       // End span
       const status = res.statusCode >= 500 ? 'error' : 'ok';
       traceContext.endSpan(traceId, status);
-      
+
       // Set span attributes
       traceContext.setAttribute(traceId, 'http.status_code', res.statusCode);
       if (res.statusCode >= 400) {

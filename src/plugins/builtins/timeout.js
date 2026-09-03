@@ -15,15 +15,15 @@ export default {
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.timeout || DEFAULT_OPTIONS;
-    
+
     // Allow per-request timeout override via header
     const customTimeout = req.headers[options.headerTimeout];
     const timeout = customTimeout ? parseInt(customTimeout) : options.upstreamTimeout;
-    
+
     // Attach timeout to request for use by proxy
     req.upstreamTimeout = timeout;
     req.idleTimeout = options.idleTimeout;
-    
+
     // Set response timeout
     res.setTimeout(timeout, () => {
       logger.error(`Upstream timeout: ${timeout}ms for ${req.path}`);

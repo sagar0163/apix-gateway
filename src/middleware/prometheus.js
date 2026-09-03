@@ -36,8 +36,8 @@ const inc = (obj, key) => {
 
 // Prometheus format helper
 const toPrometheus = (name, value, labels = {}, type = 'gauge') => {
-  const labelStr = Object.entries(labels).length > 0 
-    ? `{${Object.entries(labels).map(([k, v]) => `${k}="${v}"`).join(',')}}` 
+  const labelStr = Object.entries(labels).length > 0
+    ? `{${Object.entries(labels).map(([k, v]) => `${k}="${v}"`).join(',')}}`
     : '';
   return `# HELP ${name} ${type}\n# TYPE ${name} ${type}\n${name}${labelStr} ${value}\n`;
 };
@@ -60,7 +60,7 @@ export const prometheusMetrics = (options = {}) => {
     metrics.httpRequests.total++;
     inc(metrics.httpRequests.byMethod, method);
     inc(metrics.httpRequests.byStatus, statusCode);
-    
+
     // Categorize
     if (statusCode >= 200 && statusCode < 300) {
       metrics.httpRequests.success++;
@@ -84,7 +84,7 @@ export const prometheusMetrics = (options = {}) => {
     // Track response size
     res.on('finish', () => {
       const duration = Date.now() - startTime;
-      
+
       // Duration metrics
       metrics.httpDuration.sum += duration;
       metrics.httpDuration.count++;
@@ -110,7 +110,7 @@ export const getPrometheusMetrics = (options = {}) => {
 
   // HTTP Requests Total
   output += toPrometheus(`${prefix}_http_requests_total`, metrics.httpRequests.total);
-  
+
   // HTTP Requests by Method
   for (const [method, count] of Object.entries(metrics.httpRequests.byMethod)) {
     output += toPrometheus(`${prefix}_http_requests_total`, count, { method });
@@ -122,20 +122,20 @@ export const getPrometheusMetrics = (options = {}) => {
   }
 
   // HTTP Request Duration
-  const avgDuration = metrics.httpDuration.count > 0 
-    ? metrics.httpDuration.sum / metrics.httpDuration.count 
+  const avgDuration = metrics.httpDuration.count > 0
+    ? metrics.httpDuration.sum / metrics.httpDuration.count
     : 0;
   output += toPrometheus(`${prefix}_http_request_duration_seconds`, avgDuration / 1000);
   output += toPrometheus(`${prefix}_http_request_duration_seconds_max`, metrics.httpDuration.max / 1000);
 
   // Request/Response sizes
-  const avgReqSize = metrics.httpRequestSize.count > 0 
-    ? metrics.httpRequestSize.sum / metrics.httpRequestSize.count 
+  const avgReqSize = metrics.httpRequestSize.count > 0
+    ? metrics.httpRequestSize.sum / metrics.httpRequestSize.count
     : 0;
-  const avgResSize = metrics.httpResponseSize.count > 0 
-    ? metrics.httpResponseSize.sum / metrics.httpResponseSize.count 
+  const avgResSize = metrics.httpResponseSize.count > 0
+    ? metrics.httpResponseSize.sum / metrics.httpResponseSize.count
     : 0;
-  
+
   output += toPrometheus(`${prefix}_http_request_size_bytes`, avgReqSize);
   output += toPrometheus(`${prefix}_http_response_size_bytes`, avgResSize);
 
@@ -155,8 +155,8 @@ export const getPrometheusMetrics = (options = {}) => {
 // Get JSON metrics
 export const getMetricsJSON = () => {
   const mem = process.memoryUsage();
-  const avgDuration = metrics.httpDuration.count > 0 
-    ? metrics.httpDuration.sum / metrics.httpDuration.count 
+  const avgDuration = metrics.httpDuration.count > 0
+    ? metrics.httpDuration.sum / metrics.httpDuration.count
     : 0;
 
   return {
@@ -175,13 +175,13 @@ export const getMetricsJSON = () => {
     },
     size: {
       request: {
-        avg: metrics.httpRequestSize.count > 0 
-          ? Math.round(metrics.httpRequestSize.sum / metrics.httpRequestSize.count) 
+        avg: metrics.httpRequestSize.count > 0
+          ? Math.round(metrics.httpRequestSize.sum / metrics.httpRequestSize.count)
           : 0
       },
       response: {
-        avg: metrics.httpResponseSize.count > 0 
-          ? Math.round(metrics.httpResponseSize.sum / metrics.httpResponseSize.count) 
+        avg: metrics.httpResponseSize.count > 0
+          ? Math.round(metrics.httpResponseSize.sum / metrics.httpResponseSize.count)
           : 0
       }
     },

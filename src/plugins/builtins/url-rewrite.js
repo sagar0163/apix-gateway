@@ -25,7 +25,7 @@ export default {
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['url-rewrite'] || DEFAULT_OPTIONS;
     const rules = options.rules || this.rules;
-    
+
     if (rules.length === 0) {
       return next();
     }

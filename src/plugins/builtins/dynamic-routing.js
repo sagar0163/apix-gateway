@@ -24,7 +24,7 @@ export default {
   // Find matching route
   findRoute(path) {
     const matches = [];
-    
+
     for (const [regex, route] of this.routes.entries()) {
       if (regex.test(path)) {
         matches.push(route);
@@ -35,7 +35,7 @@ export default {
 
     // Sort by priority
     matches.sort((a, b) => b.priority - a.priority);
-    
+
     return matches[0];
   },
 
@@ -47,14 +47,14 @@ export default {
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['dynamic-routing'] || DEFAULT_OPTIONS;
-    
+
     // Check configured rules first
     let route = null;
-    
+
     for (const rule of options.rules || []) {
       const pattern = rule.path || rule.pattern;
       const regex = new RegExp(pattern.replace('*', '.*'));
-      
+
       if (regex.test(req.path)) {
         route = rule;
         break;
@@ -68,14 +68,14 @@ export default {
 
     if (route) {
       const target = route.target || route.url || route.upstream;
-      
+
       if (target) {
         req._routing = {
           target,
           originalPath: req.path,
           rewrittenPath: this.rewritePath(req.path, route.strip)
         };
-        
+
         // Modify request URL
         if (route.strip) {
           req.url = this.rewritePath(req.url, route.strip);
@@ -84,7 +84,7 @@ export default {
 
         res.set('X-Dynamic-Route', 'true');
         res.set('X-Upstream', target);
-        
+
         logger.debug(`Dynamic route: ${req.path} -> ${target}`);
       }
     }

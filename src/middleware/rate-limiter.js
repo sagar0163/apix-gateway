@@ -53,17 +53,17 @@ const createRateLimiter = (options = {}) => {
       if (redis && redisClient) {
         // Redis-based sliding window
         const redisKey = `ratelimit:${key}`;
-        
+
         // Remove old entries
         await redisClient.zRemRangeByScore(redisKey, 0, windowStart);
-        
+
         // Count current requests
         currentCount = await redisClient.zCard(redisKey);
-        
+
         // Check if blocked
         const blockedKey = `ratelimit:blocked:${key}`;
         const blockedUntil = await redisClient.get(blockedKey);
-        
+
         if (blockedUntil && parseInt(blockedUntil) > now) {
           isBlocked = true;
           const retryAfter = Math.ceil((parseInt(blockedUntil) - now) / 1000);
@@ -76,7 +76,7 @@ const createRateLimiter = (options = {}) => {
       } else {
         // In-memory sliding window
         const record = memoryStore.get(key);
-        
+
         if (!record) {
           memoryStore.set(key, { count: 1, windowStart: now, blockedUntil: 0 });
           currentCount = 1;
@@ -128,7 +128,7 @@ const createRateLimiter = (options = {}) => {
       res.on('finish', async () => {
         const shouldSkip = (skipSuccessfulRequests && res.statusCode < 400) ||
                          (skipFailedRequests && res.statusCode >= 400);
-        
+
         if (shouldSkip) {
           if (redis && redisClient) {
             const redisKey = `ratelimit:${key}`;

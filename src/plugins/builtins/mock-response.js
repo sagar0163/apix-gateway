@@ -23,7 +23,7 @@ export default {
     }
 
     const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-    
+
     for (const file of files) {
       try {
         const mock = JSON.parse(fs.readFileSync(`${dir}/${file}`, 'utf8'));
@@ -58,14 +58,14 @@ export default {
 
   handler: (req, res, next) => {
     const options = req._pluginOptions?.['mock-response'] || DEFAULT_OPTIONS;
-    
+
     if (!options.enabled) {
       return next();
     }
 
     // Check for mock header override
     const useMock = req.headers['x-use-mock'] === 'true' || req.query._mock === 'true';
-    
+
     if (!useMock && !options.passthrough) {
       return next();
     }
@@ -90,7 +90,7 @@ export default {
       const headers = mock.headers || {};
 
       res.status(status);
-      
+
       Object.entries(headers).forEach(([key, value]) => {
         res.set(key, value);
       });

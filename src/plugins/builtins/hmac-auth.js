@@ -38,24 +38,24 @@ export default {
     const expected = this.generate(secret, message, algorithm);
     const sigBuf = Buffer.from(signature);
     const expBuf = Buffer.from(expected);
-    
+
     if (sigBuf.length !== expBuf.length) {
       return false;
     }
-    
+
     return crypto.timingSafeEqual(sigBuf, expBuf);
   },
 
   handler: function(req, res, next) {
     const options = req._pluginOptions?.['hmac-auth'] || DEFAULT_OPTIONS;
-    
+
     const signature = req.headers[options.headerName?.toLowerCase()];
     const nonce = req.headers[options.headerNonce?.toLowerCase()];
     const secretId = req.headers['x-secret-id'] || 'default';
-    
+
     if (!signature) {
-      return res.status(401).json({ 
-        error: 'Unauthorized', 
+      return res.status(401).json({
+        error: 'Unauthorized',
         message: 'HMAC signature required',
         header: options.headerName
       });

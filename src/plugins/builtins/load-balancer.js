@@ -67,10 +67,10 @@ export default {
   // Consistent hashing with virtual nodes
   consistentHash(key, targets) {
     if (!targets.length) return null;
-    
+
     const options = this.options || DEFAULT_OPTIONS;
     const vNodes = options.consistentHashing?.virtualNodes || 150;
-    
+
     // Build hash ring
     const ring = [];
     for (const target of targets) {
@@ -80,7 +80,7 @@ export default {
       }
     }
     ring.sort((a, b) => a.hash - b.hash);
-    
+
     // Find the first target with hash >= key hash
     const keyHash = this.hash(key, vNodes * targets.length);
     for (const entry of ring) {
@@ -88,7 +88,7 @@ export default {
         return entry.target;
       }
     }
-    
+
     // Wrap around to first
     return ring[0]?.target || targets[0];
   },
@@ -149,7 +149,7 @@ export default {
   trackCohort(route, geo, targetUrl, success, latency) {
     const key = this.getCohortKey(route, geo, targetUrl);
     let cohort = this.cohortMetrics.get(key);
-    
+
     if (!cohort) {
       cohort = {
         route,
@@ -164,7 +164,7 @@ export default {
       };
       this.cohortMetrics.set(key, cohort);
     }
-    
+
     cohort.requestCount++;
     if (success) {
       cohort.successes++;
@@ -199,32 +199,32 @@ export default {
       const url = new URL(options.healthCheck.path || '/health', target.url);
       const protocol = options.healthCheck.useHttps || url.protocol === 'https:' ? https : http;
       const startTime = Date.now();
-      
+
       const req = protocol.get(url, { timeout: options.healthCheck.timeout }, (res) => {
         const latency = Date.now() - startTime;
         target.lastHealthCheck = Date.now();
         target.healthCheckLatency = latency;
-        
+
         const isStatusHealthy = res.statusCode < (options.healthCheck.expectedStatus || 500);
         let isBodyHealthy = true;
-        
+
         let body = '';
         res.on('data', (chunk) => body += chunk);
         res.on('end', () => {
           if (options.healthCheck.verifyResponse && options.healthCheck.expectedText) {
             isBodyHealthy = body.includes(options.healthCheck.expectedText);
           }
-          
+
           const isHealthy = isStatusHealthy && isBodyHealthy;
-          
+
           if (isHealthy) {
             target.healthCheckFailures = 0;
           } else {
             target.healthCheckFailures++;
-            const reason = !isStatusHealthy ? `status ${res.statusCode}` : `body mismatch`;
+            const reason = !isStatusHealthy ? `status ${res.statusCode}` : 'body mismatch';
             logger.warn(`Health check failed for ${target.url}: ${reason}`);
           }
-          
+
           // SEPARATE: Update infra health based on health check only
           this.updateTargetHealth(target, options, 'infra');
         });
@@ -252,14 +252,14 @@ export default {
 
     runCheck();
     this.healthCheckTimer = setInterval(runCheck, options.healthCheck.interval);
-    
+
     logger.info('Health check started for load balancer (separate infra/app tracking)');
   },
 
   // Update target health - separate infra and app logic
   updateTargetHealth(target, options, type) {
     const now = Date.now();
-    
+
     if (type === 'infra') {
       // Infrastructure health: based on health check
       if (target.healthCheckFailures >= options.healthCheck.unhealthyThreshold) {
@@ -296,7 +296,7 @@ export default {
   getTarget(strategy = 'round-robin', clientIp = '', route = '/') {
     // Filter by global health
     let filteredTargets = this.targets.filter(t => t.healthy);
-    
+
     // NEW: Cohort-aware filtering (Ben's suggestion #2)
     // If a target has a very high error rate for THIS specific route/geo, bypass it
     // even if it's overall healthy for other cohorts.
@@ -323,46 +323,46 @@ export default {
     const healthyTargets = filteredTargets;
 
     switch (strategy) {
-      case 'ip-hash':
-        if (clientIp) {
-          // Use consistent hashing for better distribution
-          target = this.consistentHash(clientIp, healthyTargets);
-        } else {
-          target = healthyTargets[this.currentIndex % healthyTargets.length];
-          this.currentIndex++;
-        }
-        break;
-        
-      case 'least-connections':
-        target = healthyTargets.reduce((min, t) => 
-          (this.connections.get(t.url) || 0) < (this.connections.get(min.url) || 0) ? t : min
-        );
-        break;
-
-      case 'latency':
-        target = healthyTargets.reduce((min, t) => 
-          t.latency < min.latency ? t : min
-        );
-        break;
-
-      case 'weighted':
-        const totalWeight = healthyTargets.reduce((sum, t) => sum + t.effectiveWeight, 0);
-        let random = Math.random() * totalWeight;
-        for (const t of healthyTargets) {
-          random -= t.effectiveWeight;
-          if (random <= 0) {
-            target = t;
-            break;
-          }
-        }
-        if (!target) target = healthyTargets[0];
-        break;
-        
-      case 'round-robin':
-      default:
+    case 'ip-hash':
+      if (clientIp) {
+        // Use consistent hashing for better distribution
+        target = this.consistentHash(clientIp, healthyTargets);
+      } else {
         target = healthyTargets[this.currentIndex % healthyTargets.length];
         this.currentIndex++;
-        break;
+      }
+      break;
+
+    case 'least-connections':
+      target = healthyTargets.reduce((min, t) =>
+        (this.connections.get(t.url) || 0) < (this.connections.get(min.url) || 0) ? t : min
+      );
+      break;
+
+    case 'latency':
+      target = healthyTargets.reduce((min, t) =>
+        t.latency < min.latency ? t : min
+      );
+      break;
+
+    case 'weighted':
+      const totalWeight = healthyTargets.reduce((sum, t) => sum + t.effectiveWeight, 0);
+      let random = Math.random() * totalWeight;
+      for (const t of healthyTargets) {
+        random -= t.effectiveWeight;
+        if (random <= 0) {
+          target = t;
+          break;
+        }
+      }
+      if (!target) target = healthyTargets[0];
+      break;
+
+    case 'round-robin':
+    default:
+      target = healthyTargets[this.currentIndex % healthyTargets.length];
+      this.currentIndex++;
+      break;
     }
 
     const conns = this.connections.get(target.url) || 0;
@@ -376,7 +376,7 @@ export default {
   release(target, success, latency = 0, route = '/', geo = 'unknown', body = null) {
     const conns = this.connections.get(target.url) || 1;
     this.connections.set(target.url, Math.max(0, conns - 1));
-    
+
     const now = Date.now();
     const options = this.options || DEFAULT_OPTIONS;
     const recoveryThreshold = options.recoveryThreshold || DEFAULT_OPTIONS.recoveryThreshold;
@@ -402,14 +402,14 @@ export default {
     if (isActuallySuccessful) {
       target.requestSuccesses++;
       target.lastSuccessTime = now;
-      
+
       if (latency > 0) {
         target.latency = (target.latency * 0.9) + (latency * 0.1);
       }
-      
+
       target.requestFailures = 0;
       target.consecutiveErrors = 0;
-      
+
       // Gradual recovery with cooldown
       if (target.effectiveWeight < target.weight) {
         target.effectiveWeight = Math.min(target.weight, target.effectiveWeight + target.slowStartWeight);
@@ -417,10 +417,10 @@ export default {
       if (isNaN(target.effectiveWeight)) {
         target.effectiveWeight = target.weight;
       }
-      
+
       // Require recovery threshold with cooldown
       const lastFailure = target.lastFailureTime || 0;
-      if (target.requestSuccesses >= recoveryThreshold && 
+      if (target.requestSuccesses >= recoveryThreshold &&
           (now - lastFailure) >= recoveryCooldown) {
         target.healthy = true;
       }
@@ -429,15 +429,15 @@ export default {
       target.lastFailureTime = now;
       target.failedRequests++;
       target.errorRate = target.failedRequests / target.totalRequests;
-      
+
       target.effectiveWeight = Math.max(1, target.effectiveWeight * 0.8);
-      
+
       if (target.requestFailures >= 3) {
         target.healthy = false;
         logger.warn(`Target marked unhealthy (app): ${target.url} (${target.requestFailures} failures)`);
       }
     }
-    
+
     // Legacy counters for compatibility
     target.failures = target.requestFailures;
     target.successes = target.requestSuccesses;
@@ -501,7 +501,7 @@ export default {
 
   handler(req, res, next) {
     const options = req._pluginOptions?.['load-balancer'] || DEFAULT_OPTIONS;
-    
+
     if (options.targets.length === 0) {
       return next();
     }
@@ -518,9 +518,9 @@ export default {
     const clientIp = req.ip || req.headers['x-forwarded-for'] || '';
     const route = req.path;
     const geo = req.headers['cf-ipcountry'] || req.headers['x-geo-country'] || 'unknown';
-    
+
     const target = this.getTarget(options.strategy, clientIp, route);
-    
+
     if (!target) {
       return res.status(503).json({
         error: 'Service Unavailable',
@@ -531,7 +531,7 @@ export default {
     const startTime = Date.now();
     req._target = target.url;
     req.geo = geo; // Store geo for other plugins/metrics
-    
+
     // NEW: Set release callback (Fixes lifecycle bug)
     req._onResponse = (success, latency, route, geo, body = null) => {
       this.release(target, success, latency, route, geo, body);
@@ -542,19 +542,19 @@ export default {
     const callRelease = (success, body = null) => {
       // If we already released WITH a body, or we're releasing WITHOUT a body but already did, skip.
       if (released && (!body || req._hadBody)) return;
-      
+
       released = true;
       if (body) req._hadBody = true;
-      
+
       const latency = Date.now() - startTime;
       this.release(target, success, latency, route, geo, body);
     };
-    
+
     // Fallback: Hook into 'finish' for status-based success (works with streams/proxy)
     res.on('finish', () => {
       // Small delay to allow proxyRes.on('end') in proxy.js to capture body if it exists
       setTimeout(() => {
-        const success = res.statusCode < 400; 
+        const success = res.statusCode < 400;
         callRelease(success);
       }, 10);
     });

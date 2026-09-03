@@ -54,7 +54,7 @@ function getContributors(root) {
 
   const logCmd = range
     ? `log ${range} --format="%aN|||%aE" `
-    : `log --format="%aN|||%aE"`;
+    : 'log --format="%aN|||%aE"';
 
   const output = git(logCmd, root);
   if (!output) return [];
@@ -90,10 +90,10 @@ export function generateReleaseNotes(root, version) {
   lines.push('');
 
   // Stats badge
-  lines.push(`## Release Stats`);
+  lines.push('## Release Stats');
   lines.push('');
-  lines.push(`| Metric | Value |`);
-  lines.push(`|--------|-------|`);
+  lines.push('| Metric | Value |');
+  lines.push('|--------|-------|');
   lines.push(`| Commits | ${commits.length} |`);
   lines.push(`| Files Changed | ${stats.filesChanged} |`);
   lines.push(`| Lines Added | +${stats.insertions} |`);

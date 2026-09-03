@@ -26,8 +26,8 @@ const config = loadConfig();
 
 // Trust proxy for correct IP detection
 // Only trust the first proxy if explicitly enabled via environment variable
-const trustProxy = process.env.TRUST_PROXY === 'true' ? 1 : 
-                   (process.env.TRUST_PROXY === 'false' ? false : false);
+const trustProxy = process.env.TRUST_PROXY === 'true' ? 1 :
+  (process.env.TRUST_PROXY === 'false' ? false : false);
 app.set('trust proxy', trustProxy);
 
 // =======================
@@ -36,13 +36,13 @@ app.set('trust proxy', trustProxy);
 app.use(createSecurityMiddleware());
 
 // Request body parsing with size limits
-app.use(express.json({ 
+app.use(express.json({
   limit: process.env.MAX_BODY_SIZE || '1mb',
   strict: true
 }));
 
-app.use(express.urlencoded({ 
-  extended: true, 
+app.use(express.urlencoded({
+  extended: true,
   limit: process.env.MAX_BODY_SIZE || '1mb',
   parameterLimit: 100
 }));
@@ -81,14 +81,14 @@ app.use((req, res, next) => {
 // =======================
 app.use((req, res, next) => {
   const startTime = Date.now();
-  
+
   // Log request
   logger.info(`${req.method} ${req.originalUrl}`, {
     ip: req.ip,
     userAgent: req.get('user-agent'),
     referer: req.get('referer')
   });
-  
+
   // Track response time
   res.on('finish', () => {
     const duration = Date.now() - startTime;
@@ -98,7 +98,7 @@ app.use((req, res, next) => {
       ip: req.ip
     });
   });
-  
+
   next();
 });
 
@@ -113,8 +113,8 @@ app.get('/docs', (req, res) => {
 // HEALTH CHECK
 // =======================
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
+  res.json({
+    status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     plugins: pluginManager.getEnabledPlugins().map(p => p.name)
@@ -146,9 +146,9 @@ app.get('/health/detailed', (req, res) => {
 async function initPlugins() {
   await pluginManager.loadBuiltInPlugins();
   await pluginManager.loadCustomPlugins('./plugins');
-  
+
   const pluginConfig = config.plugins || {};
-  
+
   for (const [pluginName, options] of Object.entries(pluginConfig)) {
     if (options.enabled !== false) {
       try {
@@ -168,7 +168,7 @@ async function initPlugins() {
       logger.info(`Route config loaded: ${routePrefix}`);
     }
   }
-  
+
   logger.info(`Loaded ${pluginManager.list().length} plugins, ${pluginManager.enabledPlugins.size} enabled`);
   logger.info(`Route configs: ${Object.keys(pluginManager.getAllRouteConfigs()).length} routes configured`);
 }
@@ -229,17 +229,17 @@ app.use((err, req, res, next) => {
 
 // General error handler
 app.use((err, req, res, next) => {
-  logger.error(err.message, { 
+  logger.error(err.message, {
     stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,
     ip: req.ip,
     path: req.path
   });
-  
+
   // Don't leak error details in production
-  const message = process.env.NODE_ENV === 'production' 
-    ? 'An error occurred' 
+  const message = process.env.NODE_ENV === 'production'
+    ? 'An error occurred'
     : err.message;
-  
+
   res.status(err.status || 500).json({
     error: err.name || 'Internal Server Error',
     message,
@@ -285,31 +285,31 @@ const start = () => {
   // =======================
   const gracefulShutdown = (signal) => {
     logger.info(`${signal} received, starting graceful shutdown...`);
-    
+
     // Stop accepting new connections
     server.close(() => {
       logger.info('HTTP server closed');
-      
+
       // Stop health checks
       if (pluginManager.getPlugin('load-balancer')) {
         pluginManager.getPlugin('load-balancer').stopHealthCheck();
         logger.info('Health checks stopped');
       }
-      
+
       // Close Redis connection
       redisManager.disconnect().then(() => {
         logger.info('Redis connection closed');
       }).catch(err => {
         logger.warn('Redis disconnect error:', err.message);
       });
-      
+
       // Give time for cleanup
       setTimeout(() => {
         logger.info('Graceful shutdown complete');
         process.exit(0);
       }, 5000);
     });
-    
+
     // Force exit after timeout
     setTimeout(() => {
       logger.error('Forced shutdown after timeout');
@@ -319,7 +319,7 @@ const start = () => {
 
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-  
+
   // Handle uncaught exceptions
   process.on('uncaughtException', (err) => {
     logger.error('Uncaught exception:', err);
@@ -332,10 +332,10 @@ const start = () => {
 // Check if run directly
 const startServer = () => {
   const isMain = process.argv[1] && (
-    process.argv[1].endsWith('index.js') || 
+    process.argv[1].endsWith('index.js') ||
     process.argv[1].endsWith('src/index.js')
   );
-  
+
   if (isMain && process.env.NODE_ENV !== 'test') {
     start();
   }

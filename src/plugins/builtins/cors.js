@@ -33,7 +33,7 @@ export default {
     if (options.credentials) {
       res.set('Access-Control-Allow-Credentials', 'true');
     }
-    
+
     if (options.exposedHeaders?.length) {
       res.set('Access-Control-Expose-Headers', options.exposedHeaders.join(', '));
     }
