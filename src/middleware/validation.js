@@ -325,7 +325,16 @@ export const sanitization = (req, res, next) => {
     req.body = sanitizeObject(req.body);
   }
   if (req.query) {
-    req.query = sanitizeObject(req.query);
+    // In Express 5 `req.query` is a getter-only property, so we must sanitize
+    // its values in place rather than reassigning the whole object.
+    for (const key of Object.keys(req.query)) {
+      const sanitized = sanitizeObject(req.query[key]);
+      try {
+        req.query[key] = sanitized;
+      } catch {
+        // If the property cannot be reassigned (e.g. a getter), skip it.
+      }
+    }
   }
   next();
 };

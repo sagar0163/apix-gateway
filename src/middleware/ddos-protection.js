@@ -91,9 +91,7 @@ const blockIP = (ip, reason) => {
   if (!tracker) return;
 
   tracker.blocked = true;
-  tracker.blockExpires = Date.now() + config.blockD;
-
-  duration;
+  tracker.blockExpires = Date.now() + config.blockDurationMs;
 
   logger.warn(`Blocked IP ${ip}: ${reason}`);
 

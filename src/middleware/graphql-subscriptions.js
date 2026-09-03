@@ -58,7 +58,7 @@ export const createSubscriptionServer = (options = {}) => {
     }
 
     // Handle WebSocket upgrade for subscriptions
-    const isWS = req.headers upgrade && req.headers upgrade.toLowerCase() === 'websocket';
+    const isWS = req.headers.upgrade && req.headers.upgrade.toLowerCase() === 'websocket';
     
     if (req.method === 'GET' && req.query?.query) {
       // GraphQL query execution

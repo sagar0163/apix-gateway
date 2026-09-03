@@ -40,7 +40,7 @@ export default {
       if (!node) return { valid: true, complexity: 0 };
 
       switch (node.kind) {
-      case 'Field':
+      case 'Field': {
         const baseCost = options.complexityCosts[node.name?.value] || options.defaultCost;
         complexity += baseCost;
 
@@ -56,6 +56,7 @@ export default {
           }
         }
         break;
+      }
 
       case 'FragmentSpread':
       case 'InlineFragment':
@@ -97,7 +98,7 @@ export default {
       if (contentType.includes('application/json')) {
         try {
           const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-          if (graphqlProtection.isIntrospectionQuery(JSON.stringify(body.query))) {
+          if (this.isIntrospectionQuery(JSON.stringify(body.query))) {
             logger.warn('Introspection query blocked');
             return res.status(400).json({
               error: 'Bad Request',

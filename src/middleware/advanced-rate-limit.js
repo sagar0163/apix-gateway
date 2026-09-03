@@ -128,7 +128,7 @@ export const createAdvancedRateLimiter = (options = {}) => {
     let result;
 
     switch (strategy) {
-    case 'token-bucket':
+    case 'token-bucket': {
       // Token bucket algorithm
       if (!tokenBuckets.has(userId)) {
         tokenBuckets.set(userId, new TokenBucket(
@@ -140,8 +140,9 @@ export const createAdvancedRateLimiter = (options = {}) => {
       const bucket = tokenBuckets.get(userId);
       result = bucket.consume(1);
       break;
+    }
 
-    case 'sliding-window':
+    case 'sliding-window': {
       // Sliding window algorithm
       result = slidingWindowCheck(
         `${tier}:${userId}`,
@@ -149,13 +150,15 @@ export const createAdvancedRateLimiter = (options = {}) => {
         config.windowMs
       );
       break;
+    }
 
     case 'fixed-window':
-    default:
+    default: {
       // Fixed window (simpler)
       const windowKey = `${tier}:${userId}:${Math.floor(Date.now() / config.windowMs)}`;
       result = slidingWindowCheck(windowKey, limits.limit, config.windowMs);
       break;
+    }
     }
 
     // Set rate limit headers

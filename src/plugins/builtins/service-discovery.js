@@ -22,7 +22,7 @@ export default {
   async init(options) {
     switch (options.provider) {
     case 'consul':
-      await this.initConsul(options);
+      await this.initConsul(options, options.consulService || 'default');
       break;
     case 'kubernetes':
       await this.initKubernetes(options);
@@ -39,7 +39,7 @@ export default {
   },
 
   // Consul integration
-  async initConsul(options) {
+  async initConsul(options, serviceName) {
     const consulUrl = options.services?.consul;
     if (!consulUrl) return;
 
@@ -85,7 +85,7 @@ export default {
     return service.endpoints[idx];
   },
 
-  handler: (req, res, next) => {
+  handler(req, res, next) {
     const options = req._pluginOptions?.['service-discovery'] || DEFAULT_OPTIONS;
 
     // Extract service name from path (/service-name/...)

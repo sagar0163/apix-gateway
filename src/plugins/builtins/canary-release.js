@@ -30,21 +30,23 @@ export default {
     let percentage = 0;
 
     switch (options.criteria) {
-    case 'cookie':
+    case 'cookie': {
       const cookieValue = req.cookies?.[options.cookieName];
       if (cookieValue) {
         percentage = parseInt(cookieValue, 10);
       }
       break;
+    }
 
     case 'header':
-      percentage = parseInt(req.headers[options.headerName?.toLower()] || '0', 10);
+      percentage = parseInt(req.headers[options.headerName?.toLowerCase()] || '0', 10);
       break;
 
-    case 'ip':
+    case 'ip': {
       const ip = req.ip || req.connection?.remoteAddress || '0';
       percentage = parseInt(ip.split('.').pop() || '0', 10) % 100;
       break;
+    }
 
     case 'random':
     default:
@@ -72,11 +74,11 @@ export default {
   },
 
   // Get canary targets
-  getTargets(path) {
+  getTargets(options, path) {
     return options.weights[path] || {};
   },
 
-  handler: (req, res, next) => {
+  handler(req, res, next) {
     const options = req._pluginOptions?.['canary-release'] || DEFAULT_OPTIONS;
 
     const path = req.path;
