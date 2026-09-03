@@ -9,18 +9,18 @@ const topics = new Map();
 // Event emitter for pub/sub
 const emitter = {
   listeners: new Map(),
-  
+
   on(event, callback) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
     this.listeners.get(event).add(callback);
-    
+
     return () => {
       this.listeners.get(event).delete(callback);
     };
   },
-  
+
   emit(event, data) {
     if (this.listeners.has(event)) {
       for (const callback of this.listeners.get(event)) {
@@ -32,7 +32,7 @@ const emitter = {
       }
     }
   },
-  
+
   off(event, callback) {
     if (callback) {
       this.listeners.get(event)?.delete(callback);
@@ -59,23 +59,23 @@ export const createSubscriptionServer = (options = {}) => {
 
     // Handle WebSocket upgrade for subscriptions
     const isWS = req.headers.upgrade && req.headers.upgrade.toLowerCase() === 'websocket';
-    
+
     if (req.method === 'GET' && req.query?.query) {
       // GraphQL query execution
       return next();
     }
-    
+
     if (req.method === 'POST' && req.body?.query) {
       // Handle subscriptions in query
       const { query, variables, operationName } = req.body;
-      
+
       if (query.includes('subscription')) {
         return res.status(400).json({
           error: 'Bad Request',
           message: 'Use WebSocket for subscriptions'
         });
       }
-      
+
       return next();
     }
 
@@ -86,16 +86,16 @@ export const createSubscriptionServer = (options = {}) => {
 // Subscribe to a topic
 export const subscribe = (topic, callback) => {
   const id = generateSubId();
-  
+
   if (!topics.has(topic)) {
     topics.set(topic, new Set());
   }
-  
+
   topics.get(topic).add(id);
   subscriptions.set(id, { topic, callback, createdAt: Date.now() });
-  
+
   logger.debug(`Subscription created: ${id} for topic: ${topic}`);
-  
+
   // Return unsubscribe function
   return () => unsubscribe(id);
 };
@@ -114,7 +114,7 @@ const unsubscribe = (id) => {
 export const publish = (topic, payload) => {
   logger.debug(`Publishing to topic: ${topic}`);
   emitter.emit(topic, payload);
-  
+
   // Send to all subscribers
   if (topics.has(topic)) {
     for (const subId of topics.get(topic)) {
@@ -134,7 +134,7 @@ export const publish = (topic, payload) => {
 export const withFilter = (filterFn) => {
   return (asyncIterator, filter) => {
     const buffer = [];
-    
+
     return {
       [Symbol.asyncIterator]() {
         return this;
@@ -142,22 +142,22 @@ export const withFilter = (filterFn) => {
       async next() {
         while (true) {
           let value;
-          let done = false;
-          
+          let done;
+
           // Get next value from iterator
           const result = await asyncIterator.next();
           value = result.value;
           done = result.done;
-          
+
           if (done) {
             return { done, value };
           }
-          
+
           // Apply filter
           if (await filterFn(value, filter)) {
             return { done: false, value };
           }
-          
+
           // Buffer for later if needed
           if (buffer.length < 100) {
             buffer.push(value);
@@ -172,20 +172,20 @@ export const withFilter = (filterFn) => {
 export const pubsub = {
   subscribe,
   publish,
-  
+
   // Create async iterator for subscription
   asyncIterator(topic) {
     const queue = [];
     let resolve;
     let promise;
-    
+
     const getNext = () => {
       if (queue.length > 0) {
         return Promise.resolve({ done: false, value: queue.shift() });
       }
-      
+
       promise = new Promise((r) => { resolve = r; });
-      
+
       const unsubscribe = subscribe(topic, (payload) => {
         queue.push(payload);
         if (resolve) {
@@ -194,10 +194,10 @@ export const pubsub = {
           promise = null;
         }
       });
-      
+
       return promise;
     };
-    
+
     return {
       [Symbol.asyncIterator]() {
         return this;
@@ -215,11 +215,11 @@ export const pubsub = {
 // Get subscription stats
 export const getSubscriptionStats = () => {
   const topicStats = {};
-  
+
   for (const [topic, subs] of topics.entries()) {
     topicStats[topic] = subs.size;
   }
-  
+
   return {
     totalSubscriptions: subscriptions.size,
     topics: topicStats,
@@ -231,7 +231,7 @@ export const getSubscriptionStats = () => {
 const cleanupInterval = setInterval(() => {
   const now = Date.now();
   const maxAge = 3600000; // 1 hour
-  
+
   for (const [id, sub] of subscriptions.entries()) {
     if (now - sub.createdAt > maxAge) {
       unsubscribe(id);
