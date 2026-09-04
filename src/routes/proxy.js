@@ -152,85 +152,87 @@ router.use('/', async (req, res, next) => {
       pathRewrite: {
         [`^${api.prefix}`]: ''
       },
-      onProxyReq: (proxyReq, req) => {
-        logger.debug(`Proxying to ${target}${req.path}`);
+      on: {
+        proxyReq: (proxyReq, req) => {
+          logger.debug(`Proxying to ${target}${req.path}`);
 
-        const sanitizedHeaders = sanitizeHeaders(req.headers);
-        for (const [key, value] of Object.entries(sanitizedHeaders)) {
-          if (key !== 'host') {
-            proxyReq.setHeader(key, value);
+          const sanitizedHeaders = sanitizeHeaders(req.headers);
+          for (const [key, value] of Object.entries(sanitizedHeaders)) {
+            if (key !== 'host') {
+              proxyReq.setHeader(key, value);
+            }
           }
-        }
 
-        if (req.user) {
-          proxyReq.setHeader('X-User-Id', req.user.id);
-          proxyReq.setHeader('X-User-Role', req.user.role || 'unknown');
-        }
+          if (req.user) {
+            proxyReq.setHeader('X-User-Id', req.user.id);
+            proxyReq.setHeader('X-User-Role', req.user.role || 'unknown');
+          }
 
-        proxyReq.setHeader('X-Forwarded-For', req.ip);
-        proxyReq.setHeader('X-Gateway-Request-Id', req.id || `req-${Date.now()}`);
-        proxyReq.setHeader('X-Proxy-By', 'apix-gateway');
-      },
-      onProxyRes: (proxyRes, req, res) => {
+          proxyReq.setHeader('X-Forwarded-For', req.ip);
+          proxyReq.setHeader('X-Gateway-Request-Id', req.id || `req-${Date.now()}`);
+          proxyReq.setHeader('X-Proxy-By', 'apix-gateway');
+        },
+        proxyRes: (proxyRes, req, res) => {
         // =======================
         // POST-PROXY PHASE
         // Run post-proxy plugins on the response
         // =======================
-        delete proxyRes.headers['www-authenticate'];
-        const proxyLatency = proxyRes.headers['x-response-time'];
-        if (proxyLatency) {
-          res.set('X-Upstream-Latency', proxyLatency);
-        }
+          delete proxyRes.headers['www-authenticate'];
+          const proxyLatency = proxyRes.headers['x-response-time'];
+          if (proxyLatency) {
+            res.set('X-Upstream-Latency', proxyLatency);
+          }
 
-        // Run post-proxy plugins (non-blocking)
-        pluginManager.runPostProxy(req, res).catch(err => {
-          logger.error('Post-proxy plugin error:', err);
-        });
-
-        // Buffer body for Load Balancer soft-failure checks
-        const lb = req._pluginOptions?.['load-balancer'];
-        if (lb?.enabled && lb.trustedSuccessPatterns?.enabled) {
-          let body = Buffer.from([]);
-          proxyRes.on('data', (chunk) => {
-            if (body.length < 16384) {
-              body = Buffer.concat([body, chunk]);
-            }
+          // Run post-proxy plugins (non-blocking)
+          pluginManager.runPostProxy(req, res).catch(err => {
+            logger.error('Post-proxy plugin error:', err);
           });
-          proxyRes.on('end', () => {
-            if (req._onResponse) {
-              const success = res.statusCode < 400;
-              const latency = Date.now() - (req._startTime || Date.now());
-              const geo = req.headers['cf-ipcountry'] || req.headers['x-geo-country'] || 'unknown';
-              req._onResponse(success, latency, req.path, geo, body.toString());
-            }
-          });
-        }
-      },
-      onError: (err, req, res) => {
-        // =======================
-        // ON-ERROR PHASE
-        // Run error plugins
-        // =======================
-        logger.error('Proxy error', { error: err.message, code: err.code, target });
 
-        pluginManager.runOnError(err, req, res).then(() => {
-          if (!res.headersSent) {
-            res.status(502).json({
-              error: 'Bad gateway',
-              message: 'Upstream service unavailable',
-              code: err.code
+          // Buffer body for Load Balancer soft-failure checks
+          const lb = req._pluginOptions?.['load-balancer'];
+          if (lb?.enabled && lb.trustedSuccessPatterns?.enabled) {
+            let body = Buffer.from([]);
+            proxyRes.on('data', (chunk) => {
+              if (body.length < 16384) {
+                body = Buffer.concat([body, chunk]);
+              }
+            });
+            proxyRes.on('end', () => {
+              if (req._onResponse) {
+                const success = res.statusCode < 400;
+                const latency = Date.now() - (req._startTime || Date.now());
+                const geo = req.headers['cf-ipcountry'] || req.headers['x-geo-country'] || 'unknown';
+                req._onResponse(success, latency, req.path, geo, body.toString());
+              }
             });
           }
-        }).catch(handlerErr => {
-          logger.error('Error handler failed:', handlerErr);
-          if (!res.headersSent) {
-            res.status(502).json({
-              error: 'Bad gateway',
-              message: 'Upstream service unavailable',
-              code: err.code
-            });
-          }
-        });
+        },
+        error: (err, req, res) => {
+          // =======================
+          // ON-ERROR PHASE
+          // Run error plugins
+          // =======================
+          logger.error('Proxy error', { error: err.message, code: err.code, target });
+
+          pluginManager.runOnError(err, req, res).then(() => {
+            if (!res.headersSent) {
+              res.status(502).json({
+                error: 'Bad gateway',
+                message: 'Upstream service unavailable',
+                code: err.code
+              });
+            }
+          }).catch(handlerErr => {
+            logger.error('Error handler failed:', handlerErr);
+            if (!res.headersSent) {
+              res.status(502).json({
+                error: 'Bad gateway',
+                message: 'Upstream service unavailable',
+                code: err.code
+              });
+            }
+          });
+        }
       }
     });
 

@@ -436,15 +436,17 @@ export default {
         streamEnded = true;
       }
 
-      // Add response headers
-      if (budget > 0) {
-        res.setHeader(headers.budgetLimit, budget.toString());
-        res.setHeader(headers.budgetUsed, totalTokens.toString());
-        res.setHeader(headers.budgetRemaining, Math.max(0, budget - totalTokens).toString());
+      // Add response headers (only if not already flushed to the client)
+      if (!res.headersSent) {
+        if (budget > 0) {
+          res.setHeader(headers.budgetLimit, budget.toString());
+          res.setHeader(headers.budgetUsed, totalTokens.toString());
+          res.setHeader(headers.budgetRemaining, Math.max(0, budget - totalTokens).toString());
+        }
+        res.setHeader(headers.tokensPrompt, promptTokens.toString());
+        res.setHeader(headers.tokensCompletion, completionTokens.toString());
+        res.setHeader(headers.tokensTotal, totalTokens.toString());
       }
-      res.setHeader(headers.tokensPrompt, promptTokens.toString());
-      res.setHeader(headers.tokensCompletion, completionTokens.toString());
-      res.setHeader(headers.tokensTotal, totalTokens.toString());
 
       // Update AIContext with final values
       req.aiContext.llm.promptTokens = promptTokens;

@@ -154,6 +154,7 @@ class PluginManager {
    * Get route config for a path
    */
   getRouteConfig(reqPath) {
+    if (typeof reqPath !== 'string') return null;
     for (const [prefix, config] of this.routeConfigs) {
       if (reqPath.startsWith(prefix)) {
         return { prefix, config };
@@ -303,10 +304,11 @@ class PluginManager {
         req._pluginOptions = req._pluginOptions || {};
         req._pluginOptions[name] = options;
 
+        const instance = this.pluginInstances.get(name) || this.plugins.get(name);
         if (phase === 'onError') {
-          await handler(error, req, res, () => runPlugin(index + 1));
+          await handler.call(instance, error, req, res, () => runPlugin(index + 1));
         } else {
-          await handler(req, res, () => runPlugin(index + 1));
+          await handler.call(instance, req, res, () => runPlugin(index + 1));
         }
       } catch (err) {
         logger.error(`Plugin ${name} error in ${phase}:`, err);

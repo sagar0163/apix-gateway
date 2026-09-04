@@ -533,11 +533,6 @@ export default {
     req._target = target.url;
     req.geo = geo; // Store geo for other plugins/metrics
 
-    // NEW: Set release callback (Fixes lifecycle bug)
-    req._onResponse = (success, latency, route, geo, body = null) => {
-      this.release(target, success, latency, route, geo, body);
-    };
-
     // Track if release was called to prevent double-counting
     let released = false;
     const callRelease = (success, body = null) => {
@@ -549,6 +544,14 @@ export default {
 
       const latency = Date.now() - startTime;
       this.release(target, success, latency, route, geo, body);
+    };
+
+    // NEW: Set release callback (Fixes lifecycle bug)
+    // Routed through callRelease so it marks `released`/`_hadBody`, preventing
+    // the res.on('finish') fallback below from re-releasing with a stale
+    // status-only success and wiping out the body-based failure tracking above.
+    req._onResponse = (success, latency, route, geo, body = null) => {
+      callRelease(success, body);
     };
 
     // Fallback: Hook into 'finish' for status-based success (works with streams/proxy)
