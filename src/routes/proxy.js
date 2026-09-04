@@ -52,9 +52,8 @@ const sanitizeHeaders = (headers) => {
   const sanitized = { ...headers };
   const dangerousPatterns = [
     /\r\n/gi,
-    /\x0d\x0a/gi,
-    /\x0a/gi,
-    /\x0d/gi
+    /\n/gi,
+    /\r/gi
   ];
 
   for (const [key, value] of Object.entries(sanitized)) {

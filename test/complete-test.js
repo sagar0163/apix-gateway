@@ -23,12 +23,12 @@ const RESULTS = {
 
 function testHeaderInjection() {
   console.log('\n🔒 SECURITY TEST: Header Injection Prevention');
-  
+
   // Test the sanitization logic from proxy.js
   const sanitizeHeaders = (headers) => {
     const sanitized = { ...headers };
-    const dangerousPatterns = [/\r\n/gi, /\x0d\x0a/gi, /\x0a/gi, /\x0d/gi];
-    
+    const dangerousPatterns = [/\r\n/gi, /\n/gi, /\r/gi];
+
     for (const [key, value] of Object.entries(sanitized)) {
       if (typeof value === 'string') {
         let sanitizedValue = value;
@@ -44,12 +44,12 @@ function testHeaderInjection() {
     }
     return sanitized;
   };
-  
+
   const tests = [
     { input: { 'X-Test': 'normal' }, expect: 'normal', desc: 'Normal header' },
     { input: { 'X-Test': 'value\r\nX-Inject: bad' }, expect: undefined, desc: 'CRLF injection' },
   ];
-  
+
   let passed = 0;
   for (const tc of tests) {
     const result = sanitizeHeaders(tc.input);
@@ -58,14 +58,14 @@ function testHeaderInjection() {
       passed++;
     }
   }
-  
+
   RESULTS.security.passed += passed;
   return passed === tests.length;
 }
 
 function testRaceCondition() {
   console.log('\n🔒 SECURITY TEST: Race Conditions');
-  
+
   // Test plugin manager thread safety simulation
   class PluginManager {
     constructor() {
@@ -81,10 +81,10 @@ function testRaceCondition() {
       };
     }
   }
-  
+
   const pm = new PluginManager();
   for (let i = 0; i < 10; i++) pm.enable(`plugin-${i}`);
-  
+
   let errors = 0;
   for (let i = 0; i < 50; i++) {
     try {
@@ -92,17 +92,17 @@ function testRaceCondition() {
       if (plugins.length !== 10) errors++;
     } catch (e) { errors++; }
   }
-  
+
   const passed = errors === 0;
   if (passed) RESULTS.security.passed++;
   else RESULTS.security.failed++;
-  
+
   return passed;
 }
 
 function testCircuitBreaker() {
   console.log('\n🔒 SECURITY TEST: Circuit Breaker Thread Safety');
-  
+
   class CircuitStore {
     constructor() { this.circuits = new Map(); }
     getOrCreate(service) {
@@ -121,19 +121,19 @@ function testCircuitBreaker() {
       return false;
     }
   }
-  
+
   const store = new CircuitStore();
   let opens = 0;
-  
+
   // Simulate concurrent failures
   for (let i = 0; i < 10; i++) {
     if (store.tryOpen('svc', 5)) opens++;
   }
-  
+
   const passed = opens === 1; // Should open exactly once
   if (passed) RESULTS.security.passed++;
   else RESULTS.security.failed++;
-  
+
   return passed;
 }
 
@@ -143,7 +143,7 @@ function testCircuitBreaker() {
 
 async function scalabilityTest() {
   console.log('\n📈 SCALABILITY TEST: Baseline & Spike');
-  
+
   // Create mock gateway
   const gateway = http.createServer((req, res) => {
     if (req.url === '/health') {
@@ -154,22 +154,22 @@ async function scalabilityTest() {
       res.end('ok');
     }
   });
-  
+
   await new Promise(r => gateway.listen(3000, r));
   console.log('Mock gateway on port 3000');
-  
+
   const latencies = [];
   let requests = 0;
   let currentRPS = 100;
   const maxRPS = 3000;
   const duration = 30000;
-  
+
   const startTime = Date.now();
-  
+
   while (Date.now() - startTime < duration) {
     const batchSize = Math.ceil(currentRPS / 10);
     const promises = [];
-    
+
     for (let i = 0; i < batchSize; i++) {
       const start = performance.now();
       promises.push(new Promise(resolve => {
@@ -183,45 +183,45 @@ async function scalabilityTest() {
         req.on('error', () => resolve());
       }));
     }
-    
+
     await Promise.all(promises);
     await new Promise(r => setTimeout(r, 100));
-    
+
     if (requests % 500 < batchSize) {
       const sorted = [...latencies].sort((a, b) => a - b);
       const p99 = sorted[Math.floor(sorted.length * 0.99)] || 0;
       const rps = Math.floor(requests / ((Date.now() - startTime) / 1000));
-      
+
       RESULTS.scalability.baseline.push({ rps, p99: +p99.toFixed(0) });
-      
+
       if (!RESULTS.scalability.breakingPoint && p99 > 200) {
         RESULTS.scalability.breakingPoint = rps;
       }
-      
+
       console.log(`${rps} RPS | p99: ${p99.toFixed(0)}ms`);
     }
-    
+
     currentRPS = Math.min(currentRPS + 50, maxRPS);
   }
-  
+
   gateway.close();
   return RESULTS.scalability.breakingPoint;
 }
 
 async function connectionSaturationTest() {
   console.log('\n📈 SCALABILITY TEST: Connection Saturation');
-  
+
   const gateway = http.createServer((req, res) => {
     res.writeHead(200); res.end('ok');
   });
-  
+
   await new Promise(r => gateway.listen(3001, r));
-  
+
   const agent = new http.Agent({ keepAlive: true, maxSockets: 500 });
-  
+
   let success = 0, rejected = 0;
   const promises = [];
-  
+
   for (let i = 0; i < 500; i++) {
     promises.push(new Promise(resolve => {
       const req = http.get('http://localhost:3001/health', { agent }, (res) => {
@@ -231,19 +231,19 @@ async function connectionSaturationTest() {
       req.setTimeout(2000, () => { resolve(); });
     }));
   }
-  
+
   await Promise.race([Promise.all(promises), new Promise(r => setTimeout(r, 10000))]);
-  
+
   agent.destroy();
   gateway.close();
-  
+
   console.log(`Connections: ${success} success, ${rejected} rejected`);
   return { success, rejected };
 }
 
 async function backpressureTest() {
   console.log('\n📈 SCALABILITY TEST: Backpressure');
-  
+
   const slowServer = http.createServer((req, res) => {
     if (Math.random() < 0.1) {
       setTimeout(() => { res.writeHead(200); res.end('slow'); }, 2000);
@@ -251,11 +251,11 @@ async function backpressureTest() {
       res.writeHead(200); res.end('fast');
     }
   });
-  
+
   await new Promise(r => slowServer.listen(3002, r));
-  
+
   let slow = 0, fast = 0;
-  
+
   for (let i = 0; i < 100; i++) {
     await Promise.all(Array.from({ length: 10 }, async () => {
       const start = performance.now();
@@ -271,7 +271,7 @@ async function backpressureTest() {
       });
     }));
   }
-  
+
   slowServer.close();
   console.log(`Slow: ${slow}, Fast: ${fast}`);
   return { slow, fast };
@@ -283,7 +283,7 @@ async function backpressureTest() {
 
 function testSlidingWindowRateLimiter() {
   console.log('\n🎯 PLUGIN TEST: Sliding Window Rate Limiter');
-  
+
   // Simulate sliding window algorithm
   class SlidingWindowRateLimiter {
     constructor(windowSize, maxRequests) {
@@ -291,18 +291,18 @@ function testSlidingWindowRateLimiter() {
       this.maxRequests = maxRequests;
       this.windows = new Map();
     }
-    
+
     _getWindowId() { return Math.floor(Date.now() / 1000 / this.windowSize); }
-    
+
     check(key) {
       const now = Date.now();
       const windowId = this._getWindowId();
       const windowKey = `${key}:${windowId}`;
-      
+
       let count = this.windows.get(windowKey) || 0;
       count++;
       this.windows.set(windowKey, count);
-      
+
       // Cleanup old windows
       if (this.windows.size > 10000) {
         const cutoff = this._getWindowId() - 2;
@@ -311,7 +311,7 @@ function testSlidingWindowRateLimiter() {
           if (wk < cutoff) this.windows.delete(k);
         }
       }
-      
+
       return {
         allowed: count <= this.maxRequests,
         remaining: Math.max(0, this.maxRequests - count),
@@ -319,33 +319,33 @@ function testSlidingWindowRateLimiter() {
       };
     }
   }
-  
+
   const limiter = new SlidingWindowRateLimiter(60, 10);
-  
+
   // Test 1: Should allow within limit
   let passed = true;
   for (let i = 0; i < 10; i++) {
     const result = limiter.check('client-1');
     if (!result.allowed) { passed = false; console.log('FAIL: Should allow within limit'); }
   }
-  
+
   // Test 2: Should reject over limit
   const overLimit = limiter.check('client-1');
   if (overLimit.allowed) { passed = false; console.log('FAIL: Should reject over limit'); }
-  
+
   // Test 3: Different clients should have separate limits
   const client2 = limiter.check('client-2');
   if (!client2.allowed) { passed = false; console.log('FAIL: Different client should have separate limit'); }
-  
+
   // Test 4: Memory cleanup
   const memBefore = process.memoryUsage().heapUsed;
   for (let i = 0; i < 1000; i++) {
     limiter.check(`client-${i}`);
   }
   const memAfter = process.memoryUsage().heapUsed;
-  
+
   console.log(`Memory: ${((memAfter - memBefore) / 1024).toFixed(2)}KB for 1000 clients`);
-  
+
   if (passed) RESULTS.plugin.overhead = { test: 'sliding-window', passed: true };
   return passed;
 }
@@ -359,28 +359,28 @@ async function main() {
   console.log('║     APIX Gateway - Complete Test Suite                       ║');
   console.log('║     Security + Scalability + Plugin Tests                   ║');
   console.log('╚═══════════════════════════════════════════════════════════════╝');
-  
+
   try {
     // Part 1: Security
     testHeaderInjection();
     testRaceCondition();
     testCircuitBreaker();
-    
+
     // Part 2: Scalability
     await scalabilityTest();
     await connectionSaturationTest();
     await backpressureTest();
-    
+
     // Part 3: Plugin
     testSlidingWindowRateLimiter();
-    
+
     // Generate Report
     generateReport();
-    
+
   } catch (e) {
     console.error('Error:', e.message);
   }
-  
+
   process.exit(0);
 }
 
@@ -389,37 +389,37 @@ function generateReport() {
   console.log('╔═══════════════════════════════════════════════════════════════╗');
   console.log('║              COMPLETE TEST REPORT                             ║');
   console.log('╚═══════════════════════════════════════════════════════════════╝');
-  
+
   console.log('\n🔒 SECURITY AUDIT:');
   console.log(`  Passed: ${RESULTS.security.passed}`);
   console.log(`  Failed: ${RESULTS.security.failed}`);
-  
+
   if (RESULTS.security.vulnerabilities.length > 0) {
     console.log('  Vulnerabilities:');
     RESULTS.security.vulnerabilities.forEach(v => console.log(`    - ${v}`));
   }
-  
+
   console.log('\n📈 SCALABILITY:');
   console.log(`  Breaking Point: ${RESULTS.scalability.breakingPoint || 'Not reached'} RPS (p99 > 200ms)`);
   console.log('  RPS vs Latency:');
-  RESULTS.scalability.baseline.filter((_, i) => i % 5 === 0).forEach(s => 
+  RESULTS.scalability.baseline.filter((_, i) => i % 5 === 0).forEach(s =>
     console.log(`    ${s.rps} RPS → p99: ${s.p99}ms`)
   );
-  
+
   console.log('\n🎯 PLUGINS:');
   console.log(`  Sliding Window Rate Limiter: ${RESULTS.plugin.overhead?.passed ? 'PASS' : 'FAIL'}`);
-  
+
   console.log('\n⚠️  BOTTLENECK ANALYSIS:');
   console.log('  Primary: CPU/Memory (based on Node.js single-threaded nature)');
   console.log('  Recommendation: Horizontal scaling with K8s');
-  
+
   console.log('\n📐 K8s HPA RECOMMENDATIONS:');
   console.log('  triggers:');
   console.log('    - cpu > 70%');
   console.log('    - memory > 80%');
   console.log('    - p99_latency > 200ms');
   console.log('  minReplicas: 2, maxReplicas: 20');
-  
+
   // Save report
   fs.writeFileSync('./test/complete-report.json', JSON.stringify(RESULTS, null, 2));
   console.log('\n📄 Report: test/complete-report.json');

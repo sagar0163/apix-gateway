@@ -345,7 +345,7 @@ export default {
       );
       break;
 
-    case 'weighted':
+    case 'weighted': {
       const totalWeight = healthyTargets.reduce((sum, t) => sum + t.effectiveWeight, 0);
       let random = Math.random() * totalWeight;
       for (const t of healthyTargets) {
@@ -357,6 +357,7 @@ export default {
       }
       if (!target) target = healthyTargets[0];
       break;
+    }
 
     case 'round-robin':
     default:

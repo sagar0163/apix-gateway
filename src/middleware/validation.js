@@ -3,12 +3,16 @@ import { logger } from '../utils/logger.js';
 import crypto from 'crypto';
 
 // Sanitization patterns
+const controlCharsClass = Array.from({ length: 32 }, (_, i) => String.fromCharCode(i))
+  .concat([String.fromCharCode(127)])
+  .join('');
+
 const patterns = {
   // Remove null bytes
   nullBytes: /\0/g,
 
   // Remove control characters
-  controlChars: /[\x00-\x1F\x7F]/g,
+  controlChars: new RegExp('[' + controlCharsClass + ']', 'g'),
 
   // Remove SQL injection patterns
   sqlInjection: /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|CREATE|TRUNCATE)\b)/gi,

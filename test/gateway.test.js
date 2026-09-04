@@ -99,7 +99,7 @@ describe('API Gateway', () => {
       for (let i = 0; i < 25; i++) {
         await request(app).get('/api/test');
       }
-      
+
       const response = await request(app).get('/api/test');
       expect([429, 503]).toContain(response.status);
     });

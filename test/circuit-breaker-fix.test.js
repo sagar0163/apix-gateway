@@ -9,13 +9,13 @@ let mockUpstream;
 describe('Circuit Breaker Fix Verification', () => {
   beforeAll(async () => {
     mockUpstream = http.createServer((req, res) => {
-       if (req.url === '/fail') {
-         res.writeHead(500);
-         res.end('System Error');
-       } else {
-         res.writeHead(200);
-         res.end('OK');
-       }
+      if (req.url === '/fail') {
+        res.writeHead(500);
+        res.end('System Error');
+      } else {
+        res.writeHead(200);
+        res.end('OK');
+      }
     });
     await new Promise(resolve => mockUpstream.listen(3015, resolve));
 
@@ -35,7 +35,7 @@ describe('Circuit Breaker Fix Verification', () => {
   it('should open circuit after threshold of 500 errors', async () => {
     const cb = pluginManager.getPlugin('circuit-breaker');
     cb.reset('test-service');
-    
+
     // First failure
     await request(app).get('/api/test').set('x-upstream-service', 'test-service').set('x-mock-target', 'http://localhost:3015/fail');
     // Note: The proxy middleware uses config.apis. In actual test, we need a matching route.

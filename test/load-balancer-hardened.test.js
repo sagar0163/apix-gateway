@@ -22,7 +22,7 @@ describe('Hardened Load Balancer', () => {
           res.end('OK');
           return;
         }
-        
+
         // Mock specific behavior for testing
         if (req.headers['x-mock-fail'] === 'true') {
           res.writeHead(500);

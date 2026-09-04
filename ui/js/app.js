@@ -41,9 +41,9 @@ async function login(username, password) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     });
-    
+
     if (!res.ok) throw new Error('Login failed');
-    
+
     const data = await res.json();
     localStorage.setItem('apix_token', data.token);
     showDashboard();
@@ -67,7 +67,7 @@ function setupNavigation() {
       navigateTo(page);
     });
   });
-  
+
   // Login form
   document.getElementById('loginForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -79,17 +79,17 @@ function setupNavigation() {
 
 function navigateTo(page) {
   currentPage = page;
-  
+
   // Update nav
   document.querySelectorAll('.nav-link').forEach(link => {
     link.classList.toggle('active', link.dataset.page === page);
   });
-  
+
   // Show page
   document.querySelectorAll('.page').forEach(p => {
     p.style.display = p.id === page ? 'block' : 'none';
   });
-  
+
   // Load data if needed
   if (page === 'dashboard') loadStats();
   if (page === 'plugins') loadPlugins();
@@ -102,7 +102,7 @@ async function loadChaosStatus() {
   try {
     const res = await fetch('http://localhost:3099/status');
     const data = await res.json();
-    
+
     [3010, 3011, 3012].forEach(port => {
       const statusEl = document.getElementById(`status-${port}`);
       if (data.failures.includes(port)) {
@@ -252,7 +252,7 @@ async function resetCircuit(service) {
 function renderStats() {
   const uptime = formatUptime(stats.uptime);
   const memory = formatBytes(stats.memory?.heapUsed || 0);
-  
+
   document.getElementById('statUptime').textContent = uptime;
   document.getElementById('statMemory').textContent = memory;
   document.getElementById('statRequests').textContent = stats.requests?.total || '0';
@@ -282,7 +282,7 @@ function renderPlugins() {
     { name: 'bot-detection', desc: 'Bot detection', enabled: plugins.some(p => p.name === 'bot-detection') },
     { name: 'ip-whitelist', desc: 'IP filtering', enabled: plugins.some(p => p.name === 'ip-whitelist') },
   ];
-  
+
   container.innerHTML = allPlugins.map(p => `
     <div class="plugin-card fade-in">
       <div class="plugin-header">
@@ -311,7 +311,7 @@ function renderApiKeys() {
     container.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No API keys found</td></tr>';
     return;
   }
-  
+
   container.innerHTML = apiKeys.map(k => `
     <tr>
       <td>${k.name || 'Unnamed'}</td>
@@ -329,12 +329,12 @@ function renderApiKeys() {
 function renderCircuits() {
   const container = document.getElementById('circuitsTable');
   const services = Object.entries(circuits);
-  
+
   if (!services.length) {
     container.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No circuits active</td></tr>';
     return;
   }
-  
+
   container.innerHTML = services.map(([name, data]) => `
     <tr>
       <td>${name}</td>
@@ -359,12 +359,12 @@ async function fetchWithAuth(url, options = {}) {
       ...options.headers
     }
   });
-  
+
   if (res.status === 401) {
     logout();
     throw new Error('Unauthorized');
   }
-  
+
   return res;
 }
 

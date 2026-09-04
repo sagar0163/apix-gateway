@@ -21,7 +21,7 @@ export default {
     // Add request headers
     for (const [key, value] of Object.entries(options.addRequestHeaders || {})) {
       // Support dynamic values
-      let finalValue = value;
+      let finalValue;
       if (typeof value === 'function') {
         finalValue = value(req);
       } else {

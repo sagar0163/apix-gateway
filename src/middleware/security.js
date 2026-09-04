@@ -3,6 +3,12 @@ import helmet from 'helmet';
 import cors from 'cors';
 import { logger } from '../utils/logger.js';
 
+// Control character removal pattern (double-click-safe regex)
+const CONTROL_CHARS_REGEX = new RegExp(
+  '[' + Array.from({ length: 32 }, (_, i) => String.fromCharCode(i)).concat([String.fromCharCode(127)]).join('') + ']',
+  'g'
+);
+
 // Security headers configuration
 const securityHeaders = {
   contentSecurityPolicy: {
@@ -66,7 +72,7 @@ const sanitizeRequest = (req, res, next) => {
     for (const key in req.query) {
       if (typeof req.query[key] === 'string') {
         // Remove null bytes and control characters
-        req.query[key] = req.query[key].replace(/[\x00-\x1F\x7F]/g, '');
+        req.query[key] = req.query[key].replace(CONTROL_CHARS_REGEX, '');
       }
     }
   }
