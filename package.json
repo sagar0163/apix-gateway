@@ -1,5 +1,6 @@
 {
   "name": "apix-gateway",
+  "workspaces": ["packages/*"],
   "version": "1.3.0",
   "description": "A modern, fast API Gateway built with Node.js - rate limiting, authentication, caching, analytics",
   "main": "src/index.js",
