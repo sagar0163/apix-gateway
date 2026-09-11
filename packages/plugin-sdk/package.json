@@ -1,0 +1,12 @@
+{
+  "name": "@apix/plugin-sdk",
+  "version": "1.0.0",
+  "description": "SDK for creating Apix Gateway plugins",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "author": "Sagar Jadhav",
+  "license": "MIT",
+  "dependencies": {
+    "@types/express": "^4.17.21"
+  }
+}
