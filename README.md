@@ -9,6 +9,28 @@
 
 ---
 
+## ⚡ 5-Minute Quickstart
+
+Get up and running in production in under 5 minutes with our official Docker Compose templates.
+
+```bash
+# Clone the repository
+git clone https://github.com/sagar0163/apix-gateway.git
+cd apix-gateway
+
+# Start the full stack (Gateway + Redis + Dashboard)
+docker-compose up -d
+
+# Start with a predefined preset
+# Copy the desired preset, e.g., SaaS or E-commerce
+cp presets/saas.yaml apix.yaml
+docker-compose restart apix-gateway
+```
+
+Once started, the gateway is available on `http://localhost:3000` and the dashboard on `http://localhost:3001`.
+
+---
+
 ## 🎯 Problem
 
 Building API gateways from scratch is repetitive. You need rate limiting, auth, caching, logging, metrics — every time. Existing solutions are either too heavy (Kong, Traefik) or too minimal.

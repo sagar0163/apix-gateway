@@ -1,0 +1,26 @@
+# presets/ecommerce.yaml
+gateway:
+  port: 3000
+  host: 0.0.0.0
+
+rateLimit:
+  default: { window: "1m", max: 500 }
+  redis:
+    host: redis
+    port: 6379
+    keyPrefix: "apix:ecomm:rl:"
+
+auth:
+  jwt:
+    secret: "${JWT_SECRET}"
+    algorithms: ["HS256"]
+
+cache:
+  backend: "redis"
+  defaultTTL: "30m"
+  maxSize: "500MB"
+
+analytics:
+  enabled: true
+  exporter: "prometheus"
+  port: 9090

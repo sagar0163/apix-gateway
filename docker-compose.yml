@@ -19,6 +19,8 @@ services:
       - apix-network
     volumes:
       - ./plugins.json:/app/plugins.json:ro
+      - ./apix.yaml:/app/apix.yaml:ro
+      - ./presets:/app/presets:ro
 
   redis:
     image: redis:7-alpine
@@ -31,18 +33,16 @@ services:
       - apix-network
     command: redis-server --appendonly yes
 
-  # Optional: Admin dashboard (static)
-  # Uncomment to serve UI separately
-  # admin:
-  #   image: nginx:alpine
-  #   ports:
-  #     - "3001:80"
-  #   volumes:
-  #     - ./ui:/usr/share/nginx/html:ro
-  #   depends_on:
-  #     - apix-gateway
-  #   networks:
-  #     - apix-network
+  dashboard:
+    image: nginx:alpine
+    ports:
+      - "3001:80"
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
+    depends_on:
+      - apix-gateway
+    networks:
+      - apix-network
 
 networks:
   apix-network:
