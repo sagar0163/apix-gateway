@@ -1,4 +1,0 @@
-- [x] Create `@apix/plugin-sdk` package with `package.json` and TypeScript interfaces (`index.d.ts`).
-- [ ] Implement scaffolding CLI tool `apix create-plugin <name>` in `src/cli.js`.
-- [ ] Scaffold output should include testing setup (e.g., using vitest).
-- [ ] Make sure everything builds and works properly.

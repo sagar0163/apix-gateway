@@ -22,6 +22,7 @@ import { bumpVersion, getCurrentVersion, detectBumpType } from './version/manage
 import { generateChangelog } from './version/changelog.js';
 import { generateReleaseNotes } from './version/release.js';
 import { loadDeclarativeConfig, validateConfig, configToInternal, exportConfig } from './utils/declarative.js';
+import { cmdCreatePlugin } from './utils/scaffold.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -313,6 +314,7 @@ ${c.yellow}Commands:${c.reset}
   ${c.green}sync${c.reset} [file]          Apply declarative config (generates plugins.json)
   ${c.green}dump${c.reset}                 Export current config as apix-dump.yaml
   ${c.green}status${c.reset}               Show project status summary
+  ${c.green}create-plugin${c.reset} <name> Scaffold a new TypeScript plugin package
   ${c.green}help${c.reset}                 Show this help message
 
 ${c.yellow}Release Types:${c.reset}
@@ -370,6 +372,9 @@ case 'sync':
   break;
 case 'dump':
   await cmdDump();
+  break;
+case 'create-plugin':
+  cmdCreatePlugin(args[0]);
   break;
 case 'help':
 case 'h':
