@@ -1,0 +1,29 @@
+# presets/saas.yaml
+gateway:
+  port: 3000
+  host: 0.0.0.0
+
+rateLimit:
+  default: { window: "1m", max: 1000 }
+  redis:
+    host: redis
+    port: 6379
+    keyPrefix: "apix:saas:rl:"
+
+auth:
+  jwt:
+    secret: "${JWT_SECRET}"
+    algorithms: ["RS256"]
+  apiKey:
+    header: "X-API-Key"
+    lookup: "db"
+
+cache:
+  backend: "redis"
+  defaultTTL: "10m"
+  maxSize: "1GB"
+
+analytics:
+  enabled: true
+  exporter: "prometheus"
+  port: 9090
