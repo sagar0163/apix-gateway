@@ -3,7 +3,7 @@
 import express from 'express';
 import { createSecurityMiddleware } from './middleware/security.js';
 import { rateLimiter } from './middleware/rate-limiter.js';
-import { prometheusMetrics } from './middleware/prometheus.js';
+import { prometheusMetrics, getPrometheusMetrics, getMetricsJSON } from './middleware/prometheus.js';
 import { sanitization, validate, schemas } from './middleware/validation.js';
 import { loadConfig } from './utils/config.js';
 import { loadDeclarativeConfig, configToInternal, applyConfig } from './utils/declarative.js';
@@ -139,6 +139,18 @@ app.get('/health/detailed', (req, res) => {
       nodeEnv: process.env.NODE_ENV
     }
   });
+});
+
+// =======================
+// METRICS
+// =======================
+app.get('/metrics', (req, res) => {
+  const format = req.query.format;
+  if (format === 'json') {
+    return res.json(getMetricsJSON());
+  }
+  res.set('Content-Type', 'text/plain; version=0.0.4');
+  res.send(getPrometheusMetrics());
 });
 
 // =======================
