@@ -1,3 +1,3 @@
 - [x] Add `/metrics` endpoint in `src/index.js`
-- [ ] Create `/dashboards` directory and add Grafana dashboard template `apix-dashboard.json`
+- [x] Create `/dashboards` directory and add Grafana dashboard template `apix-dashboard.json`
 - [ ] Test the `/metrics` endpoint
