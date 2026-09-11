@@ -6,6 +6,7 @@ import { rateLimiter } from './middleware/rate-limiter.js';
 import { prometheusMetrics } from './middleware/prometheus.js';
 import { sanitization, validate, schemas } from './middleware/validation.js';
 import { loadConfig } from './utils/config.js';
+import { loadDeclarativeConfig, configToInternal, applyConfig } from './utils/declarative.js';
 import { logger } from './utils/logger.js';
 import { redisManager } from './utils/redis.js';
 import { pluginManager } from './plugins/index.js';
@@ -338,6 +339,33 @@ const startServer = () => {
 
   if (isMain && process.env.NODE_ENV !== 'test') {
     start();
+
+    // Hot-reloading
+    const configPath = path.resolve(process.cwd(), 'apix.yaml');
+    if (fs.existsSync(configPath)) {
+      let timeout;
+      fs.watch(configPath, (eventType) => {
+        if (eventType === 'change') {
+          clearTimeout(timeout);
+          timeout = setTimeout(async () => {
+            try {
+              logger.info('Detected apix.yaml change. Reloading configuration...');
+              const declConfig = loadDeclarativeConfig(configPath);
+              if (declConfig) {
+                const internal = configToInternal(declConfig);
+                Object.assign(config.apis, internal.apis);
+                applyConfig(declConfig, pluginManager, config.apis);
+                const { clearProxyCache } = await import('./routes/proxy.js');
+                if (clearProxyCache) clearProxyCache();
+                logger.info('Configuration hot-reloaded successfully.');
+              }
+            } catch (err) {
+              logger.error('Failed to hot-reload apix.yaml:', err.message);
+            }
+          }, 100); // debounce
+        }
+      });
+    }
   }
 };
 
