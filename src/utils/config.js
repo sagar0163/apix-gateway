@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 import fs from 'fs';
 import crypto from 'crypto';
+import { loadDeclarativeConfig, configToInternal } from './declarative.js';
+import { logger } from './logger.js';
 
 dotenv.config();
 
@@ -124,12 +126,19 @@ const loadPluginsFromFile = () => {
   return {};
 };
 
+// Load declarative config
+let declInternal = { plugins: {}, routes: {}, apis: {} };
+const declConfig = loadDeclarativeConfig('./apix.yaml');
+if (declConfig) {
+  declInternal = configToInternal(declConfig);
+}
+
 // Load config and separate plugins from routes
 const fileConfig = loadPluginsFromFile();
 const { routes: fileRoutes, ...filePlugins } = fileConfig;
 
 const config = {
-  port: parseInt(process.env.PORT || '3000'),
+  port: declInternal.port || parseInt(process.env.PORT || '3000'),
 
   jwt: {
     secret: process.env.JWT_SECRET, // MUST be set via environment variable
@@ -151,7 +160,8 @@ const config = {
     '/orders': process.env.API_ORDERS || 'http://localhost:3002',
     '/products': process.env.API_PRODUCTS || 'http://localhost:3003',
     '/test': 'http://localhost:3001',      // Added for testing
-    '/protected': 'http://localhost:3001' // Added for testing
+    '/protected': 'http://localhost:3001', // Added for testing
+    ...declInternal.apis
   },
 
   redis: {
@@ -159,10 +169,10 @@ const config = {
   },
 
   // Load plugin config from file or use defaults
-  plugins: { ...DEFAULT_PLUGINS, ...filePlugins },
+  plugins: { ...DEFAULT_PLUGINS, ...filePlugins, ...declInternal.plugins },
 
   // Load route-specific plugin configs
-  routes: fileRoutes || {}
+  routes: { ...(fileRoutes || {}), ...declInternal.routes }
 };
 
 // Apply test environment overrides

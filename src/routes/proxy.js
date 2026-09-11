@@ -260,6 +260,11 @@ router.get('/health/upstreams', (req, res) => {
   });
 });
 
+export const clearProxyCache = () => {
+  logger.info('Clearing proxy cache for hot-reload');
+  proxyCache.clear();
+};
+
 export default router;
 
 
