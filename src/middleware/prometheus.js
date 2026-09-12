@@ -156,8 +156,8 @@ export const getPrometheusMetrics = (options = {}) => {
   output += toPrometheus(`${prefix}_http_response_size_bytes`, avgResSize);
 
   // Plugin metrics
-  const avgPluginDuration = metrics.pluginDuration.count > 0 
-    ? metrics.pluginDuration.sum / metrics.pluginDuration.count 
+  const avgPluginDuration = metrics.pluginDuration.count > 0
+    ? metrics.pluginDuration.sum / metrics.pluginDuration.count
     : 0;
   output += toPrometheus(`${prefix}_plugin_execution_duration_seconds`, avgPluginDuration / 1000);
 

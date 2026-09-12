@@ -311,7 +311,7 @@ class PluginManager {
           trackPluginDuration(name, Date.now() - startTime);
           runPlugin(index + 1);
         };
-        
+
         if (phase === 'onError') {
           await handler.call(instance, error, req, res, nextWrapper);
         } else {
