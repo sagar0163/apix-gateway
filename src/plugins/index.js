@@ -1,5 +1,6 @@
 import { logger } from '../utils/logger.js';
 import { loadConfig } from '../utils/config.js';
+import { trackPluginDuration } from '../middleware/prometheus.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -305,10 +306,16 @@ class PluginManager {
         req._pluginOptions[name] = options;
 
         const instance = this.pluginInstances.get(name) || this.plugins.get(name);
+        const startTime = Date.now();
+        const nextWrapper = () => {
+          trackPluginDuration(name, Date.now() - startTime);
+          runPlugin(index + 1);
+        };
+
         if (phase === 'onError') {
-          await handler.call(instance, error, req, res, () => runPlugin(index + 1));
+          await handler.call(instance, error, req, res, nextWrapper);
         } else {
-          await handler.call(instance, req, res, () => runPlugin(index + 1));
+          await handler.call(instance, req, res, nextWrapper);
         }
       } catch (err) {
         logger.error(`Plugin ${name} error in ${phase}:`, err);

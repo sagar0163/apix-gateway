@@ -26,6 +26,11 @@ const metrics = {
     sum: 0,
     count: 0
   },
+  pluginDuration: {
+    byPlugin: {},
+    sum: 0,
+    count: 0
+  },
   uptime: process.startTime
 };
 
@@ -40,6 +45,17 @@ const toPrometheus = (name, value, labels = {}, type = 'gauge') => {
     ? `{${Object.entries(labels).map(([k, v]) => `${k}="${v}"`).join(',')}}`
     : '';
   return `# HELP ${name} ${type}\n# TYPE ${name} ${type}\n${name}${labelStr} ${value}\n`;
+};
+
+// Record plugin duration
+export const trackPluginDuration = (pluginName, durationMs) => {
+  metrics.pluginDuration.sum += durationMs;
+  metrics.pluginDuration.count++;
+  if (!metrics.pluginDuration.byPlugin[pluginName]) {
+    metrics.pluginDuration.byPlugin[pluginName] = { sum: 0, count: 0 };
+  }
+  metrics.pluginDuration.byPlugin[pluginName].sum += durationMs;
+  metrics.pluginDuration.byPlugin[pluginName].count++;
 };
 
 // Create metrics middleware
@@ -139,6 +155,17 @@ export const getPrometheusMetrics = (options = {}) => {
   output += toPrometheus(`${prefix}_http_request_size_bytes`, avgReqSize);
   output += toPrometheus(`${prefix}_http_response_size_bytes`, avgResSize);
 
+  // Plugin metrics
+  const avgPluginDuration = metrics.pluginDuration.count > 0
+    ? metrics.pluginDuration.sum / metrics.pluginDuration.count
+    : 0;
+  output += toPrometheus(`${prefix}_plugin_execution_duration_seconds`, avgPluginDuration / 1000);
+
+  for (const [plugin, data] of Object.entries(metrics.pluginDuration.byPlugin)) {
+    const avg = data.count > 0 ? data.sum / data.count : 0;
+    output += toPrometheus(`${prefix}_plugin_duration_seconds`, avg / 1000, { plugin });
+  }
+
   // Process metrics
   const mem = process.memoryUsage();
   output += toPrometheus(`${prefix}_process_resident_memory_bytes`, mem.rss);
@@ -223,5 +250,6 @@ export default {
   prometheusMetrics,
   getPrometheusMetrics,
   getMetricsJSON,
-  resetMetrics
+  resetMetrics,
+  trackPluginDuration
 };

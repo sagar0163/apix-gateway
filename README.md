@@ -165,6 +165,39 @@ gateway.usePlugin('./plugins/my-plugin');
 | `circuitBreaker` | Failure isolation |
 | `retry` | Exponential backoff |
 
+## 📈 Observability
+
+Expose native Prometheus metrics for traffic, latency, and plugin overhead out of the box.
+
+```bash
+# Prometheus text format (default)
+curl http://localhost:3000/metrics
+
+# JSON format
+curl http://localhost:3000/metrics?format=json
+```
+
+Metrics include:
+
+| Metric | Description |
+|---|---|
+| `apix_http_requests_total` | Request count, labeled by method/status |
+| `apix_http_request_duration_seconds` | Average request latency |
+| `apix_http_request_size_bytes` / `apix_http_response_size_bytes` | Payload sizes |
+| `apix_plugin_duration_seconds` | Per-plugin execution overhead |
+| `apix_process_*` | RSS, heap, and uptime |
+
+### Grafana Dashboard
+
+Import the pre-built dashboard to visualize traffic, latency, and plugin overhead:
+
+```
+dashboards/apix-dashboard.json
+```
+
+In Grafana: **Dashboards → New → Import** → upload the JSON file, then point the
+data source to your Prometheus instance scraping the gateway's `/metrics` endpoint.
+
 ## 🧪 Testing
 
 ```bash
