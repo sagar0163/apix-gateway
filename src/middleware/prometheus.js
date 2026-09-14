@@ -59,13 +59,7 @@ export const trackPluginDuration = (pluginName, durationMs) => {
 };
 
 // Create metrics middleware
-export const prometheusMetrics = (options = {}) => {
-  const {
-    prefix = 'apix',
-    includeProcessMetrics = true,
-    includeGoMetrics = false
-  } = options;
-
+export const prometheusMetrics = () => {
   return (req, res, next) => {
     const startTime = Date.now();
     const path = req.route?.path || req.path || 'unknown';
