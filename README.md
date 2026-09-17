@@ -165,6 +165,67 @@ gateway.usePlugin('./plugins/my-plugin');
 | `circuitBreaker` | Failure isolation |
 | `retry` | Exponential backoff |
 
+## 📈 Observability
+
+Expose native Prometheus metrics for traffic, latency, and plugin overhead out of the box.
+
+```bash
+# Prometheus text format (default)
+curl http://localhost:3000/metrics
+
+# JSON format
+curl http://localhost:3000/metrics?format=json
+```
+
+Metrics include:
+
+| Metric | Description |
+|---|---|
+| `apix_http_requests_total` | Request count, labeled by method/status |
+| `apix_http_request_duration_seconds` | Average request latency |
+| `apix_http_request_size_bytes` / `apix_http_response_size_bytes` | Payload sizes |
+| `apix_plugin_duration_seconds` | Per-plugin execution overhead |
+| `apix_event_loop_lag_seconds` | Event loop delay |
+| `apix_process_*` | RSS, heap, and uptime |
+
+### One-Command Observability Stack
+
+Get Prometheus scraping the gateway **and** a Grafana dashboard with the pre-built
+dashboard pre-loaded, all from the checked-in `docker-compose.yml`:
+
+```bash
+docker compose up -d prometheus grafana
+```
+
+- **Prometheus**: http://localhost:9090 (scrape config in `prometheus.yml`)
+- **Grafana**: http://localhost:3002 (default `admin`/`admin`, change via `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`)
+
+The APIX Gateway dashboard auto-loads under **Dashboards → APIX Gateway**. The
+provisioning config lives in `grafana/provisioning/`; the datasource and dashboard
+provider are wired in `grafana/provisioning/datasources/prometheus.yml` and
+`grafana/provisioning/dashboards/dashboards.yml`.
+
+### Grafana Dashboard
+
+To import into an existing Grafana instance instead, use the dashboard template:
+
+```
+dashboards/apix-dashboard.json
+```
+
+In Grafana: **Dashboards → New → Import** → upload the JSON file, then point the
+data source to your Prometheus instance scraping the gateway's `/metrics` endpoint.
+
+For a standalone Prometheus, merge this job into your `scrape_configs`:
+
+```yaml
+scrape_configs:
+  - job_name: apix-gateway
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['localhost:3000']
+```
+
 ## 🧪 Testing
 
 ```bash

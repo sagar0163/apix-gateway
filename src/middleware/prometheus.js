@@ -12,6 +12,7 @@ const metrics = {
     byStatus: {},
     byPath: {}
   },
+  eventLoopLag: 0,
   httpDuration: {
     sum: 0,
     count: 0,
@@ -26,6 +27,11 @@ const metrics = {
     sum: 0,
     count: 0
   },
+  pluginDuration: {
+    byPlugin: {},
+    sum: 0,
+    count: 0
+  },
   uptime: process.startTime
 };
 
@@ -34,41 +40,57 @@ const inc = (obj, key) => {
   obj[key] = (obj[key] || 0) + 1;
 };
 
-// Prometheus format helper
-const toPrometheus = (name, value, labels = {}, type = 'gauge') => {
-  const labelStr = Object.entries(labels).length > 0
-    ? `{${Object.entries(labels).map(([k, v]) => `${k}="${v}"`).join(',')}}`
-    : '';
-  return `# HELP ${name} ${type}\n# TYPE ${name} ${type}\n${name}${labelStr} ${value}\n`;
+// Sample event loop lag (ms) with an unref'd timer so it never holds the process open
+let eventLoopSamplerStarted = false;
+const startEventLoopLagSampling = () => {
+  if (eventLoopSamplerStarted) return;
+  eventLoopSamplerStarted = true;
+
+  let last = process.hrtime.bigint();
+  const sample = () => {
+    const now = process.hrtime.bigint();
+    metrics.eventLoopLag = Number(now - last) / 1e6;
+    last = now;
+  };
+
+  const timer = setInterval(sample, 1000);
+  if (timer.unref) timer.unref();
+  sample();
+};
+
+// Prometheus metric family helper (emits HELP/TYPE once, then all label sets)
+const promMetricFamily = (name, type, samples) => {
+  const lines = [`# HELP ${name} ${type}`, `# TYPE ${name} ${type}`];
+  for (const [labels, value] of samples) {
+    const labelStr = Object.entries(labels).length > 0
+      ? `{${Object.entries(labels).map(([k, v]) => `${k}="${v}"`).join(',')}}`
+      : '';
+    lines.push(`${name}${labelStr} ${value}`);
+  }
+  return lines.join('\n') + '\n';
+};
+
+// Record plugin duration
+export const trackPluginDuration = (pluginName, durationMs) => {
+  metrics.pluginDuration.sum += durationMs;
+  metrics.pluginDuration.count++;
+  if (!metrics.pluginDuration.byPlugin[pluginName]) {
+    metrics.pluginDuration.byPlugin[pluginName] = { sum: 0, count: 0 };
+  }
+  metrics.pluginDuration.byPlugin[pluginName].sum += durationMs;
+  metrics.pluginDuration.byPlugin[pluginName].count++;
 };
 
 // Create metrics middleware
-export const prometheusMetrics = (options = {}) => {
-  const {
-    prefix = 'apix',
-    includeProcessMetrics = true,
-    includeGoMetrics = false
-  } = options;
-
+export const prometheusMetrics = () => {
   return (req, res, next) => {
     const startTime = Date.now();
     const path = req.route?.path || req.path || 'unknown';
     const method = req.method;
-    const statusCode = res.statusCode;
 
-    // Track request
+    // Track request (status is captured on 'finish' once the route sets it)
     metrics.httpRequests.total++;
     inc(metrics.httpRequests.byMethod, method);
-    inc(metrics.httpRequests.byStatus, statusCode);
-
-    // Categorize
-    if (statusCode >= 200 && statusCode < 300) {
-      metrics.httpRequests.success++;
-    } else if (statusCode >= 400 && statusCode < 500) {
-      metrics.httpRequests.clientErrors++;
-    } else if (statusCode >= 500) {
-      metrics.httpRequests.serverErrors++;
-    }
 
     // Track by path (sanitized)
     const pathKey = path.split('/').slice(0, 4).join('/');
@@ -81,9 +103,19 @@ export const prometheusMetrics = (options = {}) => {
       metrics.httpRequestSize.count++;
     }
 
-    // Track response size
     res.on('finish', () => {
       const duration = Date.now() - startTime;
+      const statusCode = res.statusCode;
+
+      // Categorize by actual response status
+      inc(metrics.httpRequests.byStatus, statusCode);
+      if (statusCode >= 200 && statusCode < 300) {
+        metrics.httpRequests.success++;
+      } else if (statusCode >= 400 && statusCode < 500) {
+        metrics.httpRequests.clientErrors++;
+      } else if (statusCode >= 500) {
+        metrics.httpRequests.serverErrors++;
+      }
 
       // Duration metrics
       metrics.httpDuration.sum += duration;
@@ -106,27 +138,27 @@ export const prometheusMetrics = (options = {}) => {
 // Get all metrics in Prometheus format
 export const getPrometheusMetrics = (options = {}) => {
   const { prefix = 'apix' } = options;
+  startEventLoopLagSampling();
   let output = '';
 
-  // HTTP Requests Total
-  output += toPrometheus(`${prefix}_http_requests_total`, metrics.httpRequests.total);
-
-  // HTTP Requests by Method
+  // HTTP Requests Total (counter, labeled by method and status)
+  const requestSamples = [[{}, metrics.httpRequests.total]];
   for (const [method, count] of Object.entries(metrics.httpRequests.byMethod)) {
-    output += toPrometheus(`${prefix}_http_requests_total`, count, { method });
+    requestSamples.push([{ method }, count]);
   }
-
-  // HTTP Requests by Status
   for (const [status, count] of Object.entries(metrics.httpRequests.byStatus)) {
-    output += toPrometheus(`${prefix}_http_requests_total`, count, { status: String(status) });
+    requestSamples.push([{ status: String(status) }, count]);
   }
+  output += promMetricFamily(`${prefix}_http_requests_total`, 'counter', requestSamples);
 
   // HTTP Request Duration
   const avgDuration = metrics.httpDuration.count > 0
     ? metrics.httpDuration.sum / metrics.httpDuration.count
     : 0;
-  output += toPrometheus(`${prefix}_http_request_duration_seconds`, avgDuration / 1000);
-  output += toPrometheus(`${prefix}_http_request_duration_seconds_max`, metrics.httpDuration.max / 1000);
+  output += promMetricFamily(`${prefix}_http_request_duration_seconds`, 'gauge',
+    [[{}, (avgDuration / 1000)]]);
+  output += promMetricFamily(`${prefix}_http_request_duration_seconds_max`, 'gauge',
+    [[{}, (metrics.httpDuration.max / 1000)]]);
 
   // Request/Response sizes
   const avgReqSize = metrics.httpRequestSize.count > 0
@@ -136,18 +168,33 @@ export const getPrometheusMetrics = (options = {}) => {
     ? metrics.httpResponseSize.sum / metrics.httpResponseSize.count
     : 0;
 
-  output += toPrometheus(`${prefix}_http_request_size_bytes`, avgReqSize);
-  output += toPrometheus(`${prefix}_http_response_size_bytes`, avgResSize);
+  output += promMetricFamily(`${prefix}_http_request_size_bytes`, 'gauge', [[{}, avgReqSize]]);
+  output += promMetricFamily(`${prefix}_http_response_size_bytes`, 'gauge', [[{}, avgResSize]]);
+
+  // Plugin metrics
+  const avgPluginDuration = metrics.pluginDuration.count > 0
+    ? metrics.pluginDuration.sum / metrics.pluginDuration.count
+    : 0;
+  output += promMetricFamily(`${prefix}_plugin_execution_duration_seconds`, 'gauge',
+    [[{}, (avgPluginDuration / 1000)]]);
+
+  const pluginSamples = [];
+  for (const [plugin, data] of Object.entries(metrics.pluginDuration.byPlugin)) {
+    const avg = data.count > 0 ? data.sum / data.count : 0;
+    pluginSamples.push([{ plugin }, (avg / 1000)]);
+  }
+  output += promMetricFamily(`${prefix}_plugin_duration_seconds`, 'gauge', pluginSamples);
 
   // Process metrics
   const mem = process.memoryUsage();
-  output += toPrometheus(`${prefix}_process_resident_memory_bytes`, mem.rss);
-  output += toPrometheus(`${prefix}_process_heap_used_bytes`, mem.heapUsed);
-  output += toPrometheus(`${prefix}_process_heap_total_bytes`, mem.heapTotal);
-  output += toPrometheus(`${prefix}_process_uptime_seconds`, process.uptime());
+  output += promMetricFamily(`${prefix}_process_resident_memory_bytes`, 'gauge', [[{}, mem.rss]]);
+  output += promMetricFamily(`${prefix}_process_heap_used_bytes`, 'gauge', [[{}, mem.heapUsed]]);
+  output += promMetricFamily(`${prefix}_process_heap_total_bytes`, 'gauge', [[{}, mem.heapTotal]]);
+  output += promMetricFamily(`${prefix}_process_uptime_seconds`, 'gauge', [[{}, process.uptime()]]);
 
-  // Event loop lag (simplified)
-  output += toPrometheus(`${prefix}_event_loop_lag_seconds`, 0);
+  // Event loop lag (ms, sampled)
+  output += promMetricFamily(`${prefix}_event_loop_lag_seconds`, 'gauge',
+    [[{}, (metrics.eventLoopLag / 1000)]]);
 
   return output;
 };
@@ -223,5 +270,6 @@ export default {
   prometheusMetrics,
   getPrometheusMetrics,
   getMetricsJSON,
-  resetMetrics
+  resetMetrics,
+  trackPluginDuration
 };

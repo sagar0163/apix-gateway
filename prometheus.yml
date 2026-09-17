@@ -1,0 +1,19 @@
+# APIX Gateway — Prometheus scrape configuration
+# Scrapes the gateway's /metrics endpoint (Prometheus format).
+#
+# Used by the docker-compose observability stack (see docker-compose.yml).
+# For an existing Prometheus instance, merge the job below into your
+# scrape_configs and point the target at your gateway host.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: apix-gateway
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - apix-gateway:3000
+        labels:
+          service: apix-gateway
