@@ -12,6 +12,7 @@ const metrics = {
     byStatus: {},
     byPath: {}
   },
+  eventLoopLag: 0,
   httpDuration: {
     sum: 0,
     count: 0,
@@ -37,6 +38,24 @@ const metrics = {
 // Counter helper
 const inc = (obj, key) => {
   obj[key] = (obj[key] || 0) + 1;
+};
+
+// Sample event loop lag (ms) with an unref'd timer so it never holds the process open
+let eventLoopSamplerStarted = false;
+const startEventLoopLagSampling = () => {
+  if (eventLoopSamplerStarted) return;
+  eventLoopSamplerStarted = true;
+
+  let last = process.hrtime.bigint();
+  const sample = () => {
+    const now = process.hrtime.bigint();
+    metrics.eventLoopLag = Number(now - last) / 1e6;
+    last = now;
+  };
+
+  const timer = setInterval(sample, 1000);
+  if (timer.unref) timer.unref();
+  sample();
 };
 
 // Prometheus metric family helper (emits HELP/TYPE once, then all label sets)
@@ -119,6 +138,7 @@ export const prometheusMetrics = () => {
 // Get all metrics in Prometheus format
 export const getPrometheusMetrics = (options = {}) => {
   const { prefix = 'apix' } = options;
+  startEventLoopLagSampling();
   let output = '';
 
   // HTTP Requests Total (counter, labeled by method and status)
@@ -172,8 +192,9 @@ export const getPrometheusMetrics = (options = {}) => {
   output += promMetricFamily(`${prefix}_process_heap_total_bytes`, 'gauge', [[{}, mem.heapTotal]]);
   output += promMetricFamily(`${prefix}_process_uptime_seconds`, 'gauge', [[{}, process.uptime()]]);
 
-  // Event loop lag (simplified)
-  output += promMetricFamily(`${prefix}_event_loop_lag_seconds`, 'gauge', [[{}, 0]]);
+  // Event loop lag (ms, sampled)
+  output += promMetricFamily(`${prefix}_event_loop_lag_seconds`, 'gauge',
+    [[{}, (metrics.eventLoopLag / 1000)]]);
 
   return output;
 };
