@@ -10,10 +10,10 @@
 - [x] Lint clean on `src` (prior commits)
 
 ## Remaining subtasks
-- [ ] Replace hardcoded `apix_event_loop_lag_seconds 0` with real event-loop-lag sampling (unref'd timer so it doesn't hold the process open)
-- [ ] Add `prometheus.yml` scrape config for the gateway `/metrics` endpoint
-- [ ] Add Grafana provisioning: datasource (`grafana/provisioning/datasources`) + dashboard provider + dashboard json
-- [ ] Extend `docker-compose.yml` with `prometheus` + `grafana` services for one-command observability stack
-- [ ] Document the docker-compose observability stack + scrape config in README
+- [x] Replace hardcoded `apix_event_loop_lag_seconds 0` with real event-loop-lag sampling (unref'd timer so it doesn't hold the process open)
+- [x] Add `prometheus.yml` scrape config for the gateway `/metrics` endpoint
+- [x] Add Grafana provisioning: datasource (`grafana/provisioning/datasources`) + dashboard provider + dashboard json
+- [x] Extend `docker-compose.yml` with `prometheus` + `grafana` services for one-command observability stack
+- [x] Document the docker-compose observability stack + scrape config in README
 - [ ] Run `npm test` (metrics tests) + `npm run lint`; verify pre-existing unrelated failures unchanged
 - [ ] Remove plan file, final commit referencing #19, push branch
